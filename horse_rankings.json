@@ -1,0 +1,488 @@
+{
+  "horses": {
+    "368": {
+      "horse_id": 368,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1659.897277256808,
+      "lap_times": [
+        7.9354798793792725
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.9354798793792725,
+      "worst_lap_time": 7.9354798793792725,
+      "average_lap_time": 7.9354798793792725,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.93547797203064,
+      "finished": false
+    },
+    "896": {
+      "horse_id": 896,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1652.3377485387766,
+      "lap_times": [
+        7.759400367736816
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.759400367736816,
+      "worst_lap_time": 7.759400367736816,
+      "average_lap_time": 7.759400367736816,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.759397983551025,
+      "finished": false
+    },
+    "216": {
+      "horse_id": 216,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1658.850773967664,
+      "lap_times": [
+        7.814972639083862
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.814972639083862,
+      "worst_lap_time": 7.814972639083862,
+      "average_lap_time": 7.814972639083862,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.814971446990967,
+      "finished": false
+    },
+    "536": {
+      "horse_id": 536,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1615.6206968286608,
+      "lap_times": [
+        7.486560106277466
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.486560106277466,
+      "worst_lap_time": 7.486560106277466,
+      "average_lap_time": 7.486560106277466,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.486555099487305,
+      "finished": false
+    },
+    "856": {
+      "horse_id": 856,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1647.435508091648,
+      "lap_times": [
+        7.939089298248291
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.939089298248291,
+      "worst_lap_time": 7.939089298248291,
+      "average_lap_time": 7.939089298248291,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.939087629318237,
+      "finished": false
+    },
+    "176": {
+      "horse_id": 176,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1619.899684899595,
+      "lap_times": [
+        7.740435600280762
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.740435600280762,
+      "worst_lap_time": 7.740435600280762,
+      "average_lap_time": 7.740435600280762,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.740432024002075,
+      "finished": false
+    },
+    "408": {
+      "horse_id": 408,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1652.511336538669,
+      "lap_times": [
+        7.942763090133667
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.942763090133667,
+      "worst_lap_time": 7.942763090133667,
+      "average_lap_time": 7.942763090133667,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.942761182785034,
+      "finished": false
+    },
+    "80": {
+      "horse_id": 80,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1651.8935345486523,
+      "lap_times": [
+        7.809570074081421
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.809570074081421,
+      "worst_lap_time": 7.809570074081421,
+      "average_lap_time": 7.809570074081421,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.809568881988525,
+      "finished": false
+    },
+    "400": {
+      "horse_id": 400,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 2,
+      "reset_count": 2,
+      "total_distance": 3297.9040512880056,
+      "lap_times": [
+        7.7927939891815186,
+        7.850083112716675
+      ],
+      "finish_time": 7.850081205368042,
+      "best_lap_time": 7.7927939891815186,
+      "worst_lap_time": 7.850083112716675,
+      "average_lap_time": 7.821438550949097,
+      "checkpoints_reached": 18,
+      "ranking_score": 17.850081205368042,
+      "finished": true
+    },
+    "720": {
+      "horse_id": 720,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1624.8381326670453,
+      "lap_times": [
+        7.583280563354492
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.583280563354492,
+      "worst_lap_time": 7.583280563354492,
+      "average_lap_time": 7.583280563354492,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.583276271820068,
+      "finished": false
+    },
+    "40": {
+      "horse_id": 40,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1648.9837687356164,
+      "lap_times": [
+        7.827455282211304
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.827455282211304,
+      "worst_lap_time": 7.827455282211304,
+      "average_lap_time": 7.827455282211304,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.827453851699829,
+      "finished": false
+    },
+    "360": {
+      "horse_id": 360,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1633.219974376837,
+      "lap_times": [
+        7.945140600204468
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.945140600204468,
+      "worst_lap_time": 7.945140600204468,
+      "average_lap_time": 7.945140600204468,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.945138216018677,
+      "finished": false
+    },
+    "784": {
+      "horse_id": 784,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1651.7085716152296,
+      "lap_times": [
+        7.844634294509888
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.844634294509888,
+      "worst_lap_time": 7.844634294509888,
+      "average_lap_time": 7.844634294509888,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.844632387161255,
+      "finished": false
+    },
+    "456": {
+      "horse_id": 456,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 2,
+      "total_distance": 2925.280070164443,
+      "lap_times": [
+        13.802102088928223
+      ],
+      "finish_time": null,
+      "best_lap_time": 13.802102088928223,
+      "worst_lap_time": 13.802102088928223,
+      "average_lap_time": 13.802102088928223,
+      "checkpoints_reached": 16,
+      "ranking_score": 23.802100896835327,
+      "finished": false
+    },
+    "776": {
+      "horse_id": 776,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1651.0173655004292,
+      "lap_times": [
+        7.737274885177612
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.737274885177612,
+      "worst_lap_time": 7.737274885177612,
+      "average_lap_time": 7.737274885177612,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.7372727394104,
+      "finished": false
+    },
+    "96": {
+      "horse_id": 96,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1652.985793102376,
+      "lap_times": [
+        7.6829307079315186
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.6829307079315186,
+      "worst_lap_time": 7.6829307079315186,
+      "average_lap_time": 7.6829307079315186,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.68292760848999,
+      "finished": false
+    },
+    "416": {
+      "horse_id": 416,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1605.9799261598755,
+      "lap_times": [
+        7.415740013122559
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.415740013122559,
+      "worst_lap_time": 7.415740013122559,
+      "average_lap_time": 7.415740013122559,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.415736436843872,
+      "finished": false
+    },
+    "736": {
+      "horse_id": 736,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1624.3802044981126,
+      "lap_times": [
+        7.8277623653411865
+      ],
+      "finish_time": null,
+      "best_lap_time": 7.8277623653411865,
+      "worst_lap_time": 7.8277623653411865,
+      "average_lap_time": 7.8277623653411865,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.827760696411133,
+      "finished": false
+    },
+    "688": {
+      "horse_id": 688,
+      "color": [
+        0,
+        0,
+        255
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1666.6018687639282,
+      "lap_times": [
+        7.6881186962127686
+      ],
+      "finish_time": 7.688117027282715,
+      "best_lap_time": 7.6881186962127686,
+      "worst_lap_time": 7.6881186962127686,
+      "average_lap_time": 7.6881186962127686,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.688117027282715,
+      "finished": true
+    },
+    "8": {
+      "horse_id": 8,
+      "color": [
+        255,
+        255,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1626.5819709008954,
+      "lap_times": [
+        7.4005022048950195
+      ],
+      "finish_time": 7.400498151779175,
+      "best_lap_time": 7.4005022048950195,
+      "worst_lap_time": 7.4005022048950195,
+      "average_lap_time": 7.4005022048950195,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.400498151779175,
+      "finished": true
+    },
+    "328": {
+      "horse_id": 328,
+      "color": [
+        128,
+        0,
+        128
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1647.7187829456986,
+      "lap_times": [
+        7.776922225952148
+      ],
+      "finish_time": 7.776920557022095,
+      "best_lap_time": 7.776922225952148,
+      "worst_lap_time": 7.776922225952148,
+      "average_lap_time": 7.776922225952148,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.776920557022095,
+      "finished": true
+    },
+    "648": {
+      "horse_id": 648,
+      "color": [
+        255,
+        165,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1620.82082520864,
+      "lap_times": [
+        7.6919941902160645
+      ],
+      "finish_time": 7.691992282867432,
+      "best_lap_time": 7.6919941902160645,
+      "worst_lap_time": 7.6919941902160645,
+      "average_lap_time": 7.6919941902160645,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.691992282867432,
+      "finished": true
+    },
+    "968": {
+      "horse_id": 968,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1594.5704830100835,
+      "lap_times": [
+        7.481213808059692
+      ],
+      "finish_time": 7.481210708618164,
+      "best_lap_time": 7.481213808059692,
+      "worst_lap_time": 7.481213808059692,
+      "average_lap_time": 7.481213808059692,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.481210708618164,
+      "finished": true
+    }
+  }
+}

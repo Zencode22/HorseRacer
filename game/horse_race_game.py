@@ -7,7 +7,7 @@ import math
 import random
 import time
 from typing import List, Tuple
-from config import FPS, NUM_HORSES, GOAL_RADIUS
+from config import NUM_HORSES, GOAL_RADIUS
 from utils.colors import COLORS
 from models.vector2 import Vector2, distance
 from models.horse import Horse
@@ -45,12 +45,16 @@ class HorseRaceGame:
             start_pos = start_positions[i]
             horse = Horse(start_pos.x, start_pos.y, colors[i % len(colors)])
             
+            # Set initial target to START checkpoint (index 0)
             if len(self.track.checkpoint_positions) > 0:
                 horse.set_target(self.track.checkpoint_positions[0], self.track.pathfinder)
             
             forward = self.track.get_forward_direction(start_pos)
             horse.velocity = Vector2(forward.x * 2.0, forward.y * 2.0)
             horse.track = self.track
+            
+            # Set total checkpoints from track
+            horse.total_checkpoints = self.track.get_total_checkpoints()
             self.horses.append(horse)
         
         # Ranking system
@@ -89,7 +93,7 @@ class HorseRaceGame:
                 self.update()
             
             self.draw()
-            self.clock.tick(FPS)
+            self.clock.tick(60)  # Hardcoded FPS instead of importing
     
     def _create_buttons(self):
         button_y = self.height - 35
@@ -148,6 +152,7 @@ class HorseRaceGame:
         self.race_active = True
         self.race_finished = False
         self.finished_horses = []
+        self.finish_time = None
         self.ranking_manager.start_race()
         for horse in self.horses:
             self.ranking_manager.start_lap(horse.horse_id)
@@ -169,6 +174,7 @@ class HorseRaceGame:
             horse.velocity = Vector2(forward.x * 2.0, forward.y * 2.0)
             
             # Reset horse state
+            horse.has_finished = False
             horse.current_checkpoint_index = 0
             horse.checkpoint_reached_time = 0
             horse.checkpoints_visited = []
@@ -187,10 +193,15 @@ class HorseRaceGame:
         self.start_race()
     
     def update(self):
+        """Update game state"""
         if not self.race_active:
             self.start_race()
         
         for horse in self.horses:
+            # Skip if horse has already finished
+            if horse.has_finished:
+                continue
+                
             stats = self.ranking_manager.get_horse_stats(horse.horse_id)
             if stats and stats.finished:
                 continue
@@ -205,48 +216,53 @@ class HorseRaceGame:
             horse.flock(self.horses, self.track.pathfinder)
             horse.update((self.width, self.height), self.track)
             
-            # Check finish line
-            if horse.target and distance(horse.position, horse.target) < GOAL_RADIUS:
-                if horse.current_checkpoint_index >= horse.total_checkpoints:
-                    # Calculate path percentage
-                    if hasattr(self.track, 'calculate_path_percentage'):
-                        pct = self.track.calculate_path_percentage(horse.current_path)
-                        self.ranking_manager.finish_race(horse.horse_id, pct)
-                    else:
-                        self.ranking_manager.finish_race(horse.horse_id)
-                    
-                    # Record finish time
-                    stats = self.ranking_manager.get_horse_stats(horse.horse_id)
-                    if stats and stats.finish_time:
-                        self.finished_horses.append((
-                            horse.horse_id,
-                            stats.finish_time,
-                            stats.best_path_percentage,
-                            stats.reset_count
-                        ))
-                    
-                    horse.velocity = Vector2(0, 0)
-                    print(f"Horse {horse.horse_id} finished the race!")
+            # Check if horse just finished (has_finished flag set but stats not yet updated)
+            if horse.has_finished and stats and not stats.finished:
+                # This ensures the finish time is recorded
+                self.ranking_manager.finish_race(horse.horse_id)
+        
+        # Update finished horses list from horses that have finished
+        self.finished_horses = []
+        for horse in self.horses:
+            stats = self.ranking_manager.get_horse_stats(horse.horse_id)
+            if stats and stats.finished and stats.finish_time:
+                self.finished_horses.append((
+                    horse.horse_id,
+                    stats.finish_time,
+                    0,  # No path percentage
+                    stats.reset_count
+                ))
         
         # Check if all horses have finished
         if len(self.finished_horses) >= NUM_HORSES and not self.race_finished:
             self.race_finished = True
+            # Capture final race time BEFORE pausing
             self.finish_time = self.ranking_manager.get_race_time()
             # Sort finished horses by finish time
             self.finished_horses.sort(key=lambda x: x[1])  # Sort by time
-            print("\n🏁 RACE COMPLETE! All horses have finished. 🏁")
+            
+            print("\n" + "="*60)
+            print("RACE COMPLETE! All horses have finished!")
+            print("="*60)
+            for i, (hid, ftime, _, resets) in enumerate(self.finished_horses):
+                print(f"{i+1}. Horse {hid} | {ftime:.2f}s | {resets} resets")
+            print("="*60)
+            
+            # Automatically pause the game when race is complete
+            self.paused = True
+    
+    def is_race_complete(self) -> bool:
+        """Check if the race is complete (all horses finished)"""
+        return self.race_finished
     
     def draw(self):
         """Draw everything"""
         # Draw track
-        self.track.draw(self.screen, show_ideal_path=True)
+        self.track.draw(self.screen, show_ideal_path=False)
         
-        # Draw horses (only if race isn't finished or in debug mode)
-        if not self.race_finished or self.show_debug:
-            for horse in self.horses:
-                stats = self.ranking_manager.get_horse_stats(horse.horse_id)
-                if not (stats and stats.finished) or self.show_debug:
-                    horse.draw(self.screen)
+        # Draw horses
+        for horse in self.horses:
+            horse.draw(self.screen)
         
         # Draw UI elements (always)
         self._draw_buttons()
@@ -287,20 +303,33 @@ class HorseRaceGame:
         if self.race_finished:
             status += " | RACE COMPLETE"
         else:
-            status += f" | Finished: {len(self.finished_horses)}/{NUM_HORSES}"
+            finished_count = sum(1 for horse in self.horses if horse.has_finished)
+            status += f" | Finished: {finished_count}/{NUM_HORSES}"
         
         text = self.font.render(status, True, COLORS['WHITE'])
         self.screen.blit(text, (10, 10))
     
     def _draw_timer(self):
-        race_time = self.ranking_manager.get_race_time()
-        mins = int(race_time // 60)
-        secs = int(race_time % 60)
-        ms = int((race_time * 100) % 100)
+        """Draw the race timer - stops when race is complete"""
+        if self.race_finished:
+            # Show final time when race is complete
+            if self.finish_time:
+                mins = int(self.finish_time // 60)
+                secs = int(self.finish_time % 60)
+                ms = int((self.finish_time * 100) % 100)
+                time_str = f"{secs}.{ms:02d}s" if mins == 0 else f"{mins}:{secs:02d}.{ms:02d}"
+            else:
+                time_str = "0.00s"
+            color = COLORS['GREEN']
+        else:
+            # Show running time
+            race_time = self.ranking_manager.get_race_time()
+            mins = int(race_time // 60)
+            secs = int(race_time % 60)
+            ms = int((race_time * 100) % 100)
+            time_str = f"{secs}.{ms:02d}s" if mins == 0 else f"{mins}:{secs:02d}.{ms:02d}"
+            color = COLORS['RED'] if self.paused else COLORS['YELLOW']
         
-        time_str = f"{secs}.{ms:02d}s" if mins == 0 else f"{mins}:{secs:02d}.{ms:02d}"
-        
-        color = COLORS['RED'] if self.paused else COLORS['YELLOW']
         surf = self.timer_font.render(time_str, True, color)
         rect = surf.get_rect(center=(self.width//2, 35))
         
@@ -310,7 +339,7 @@ class HorseRaceGame:
     
     def _draw_results_board(self):
         """Draw the final results board when race is complete"""
-        panel_width = 500
+        panel_width = 450
         panel_height = 400
         panel_x = (self.width - panel_width) // 2
         panel_y = (self.height - panel_height) // 2
@@ -332,7 +361,7 @@ class HorseRaceGame:
                         (panel_x, panel_y, panel_width, panel_height), 4)
         
         # Title
-        title = self.big_font.render("🏁 RACE RESULTS 🏁", True, COLORS['YELLOW'])
+        title = self.big_font.render("RACE RESULTS", True, COLORS['YELLOW'])
         title_rect = title.get_rect(center=(self.width//2, panel_y + 50))
         self.screen.blit(title, title_rect)
         
@@ -343,8 +372,8 @@ class HorseRaceGame:
             self.screen.blit(time_text, time_rect)
         
         # Column headers
-        headers = ["Pos", "Horse", "Time", "Path %", "Resets"]
-        x_positions = [panel_x + 50, panel_x + 130, panel_x + 200, panel_x + 290, panel_x + 380]
+        headers = ["Pos", "Horse", "Time", "Resets"]
+        x_positions = [panel_x + 60, panel_x + 140, panel_x + 220, panel_x + 320]
         
         for i, header in enumerate(headers):
             text = self.font.render(header, True, COLORS['YELLOW'])
@@ -357,33 +386,22 @@ class HorseRaceGame:
         
         # Draw results
         y = panel_y + 160
-        for i, (horse_id, finish_time, path_pct, resets) in enumerate(self.finished_horses):
+        for i, (horse_id, finish_time, _, resets) in enumerate(self.finished_horses):
             # Get horse color
             stats = self.ranking_manager.get_horse_stats(horse_id)
             color = stats.color if stats else COLORS['WHITE']
             
-            # Medal for top 3
-            if i == 0:
-                pos_text = "🥇"
-            elif i == 1:
-                pos_text = "🥈"
-            elif i == 2:
-                pos_text = "🥉"
-            else:
-                pos_text = f"{i+1}."
+            # Use numerical position
+            pos_text = f"{i+1}."
             
             # Format time
             time_str = f"{finish_time:.2f}s"
-            
-            # Path percentage
-            pct_str = f"{path_pct:.1f}%" if path_pct > 0 else "-"
             
             # Draw row
             self.screen.blit(self.font.render(pos_text, True, COLORS['WHITE']), (x_positions[0], y))
             self.screen.blit(self.font.render(f"{horse_id}", True, color), (x_positions[1], y))
             self.screen.blit(self.font.render(time_str, True, COLORS['WHITE']), (x_positions[2], y))
-            self.screen.blit(self.font.render(pct_str, True, COLORS['WHITE']), (x_positions[3], y))
-            self.screen.blit(self.font.render(str(resets), True, COLORS['WHITE']), (x_positions[4], y))
+            self.screen.blit(self.font.render(str(resets), True, COLORS['WHITE']), (x_positions[3], y))
             
             y += 25
         
@@ -393,11 +411,25 @@ class HorseRaceGame:
         self.screen.blit(inst_text, inst_rect)
     
     def _draw_rankings(self):
-        """Draw rankings panel on the right side of screen"""
+        """Draw rankings panel on the right side of screen - shows ALL horses with completion times"""
         panel_width = 280
         panel_x = self.width - panel_width - 15
         panel_y = 70
-        panel_height = 300
+        
+        # Calculate dynamic height based on number of horses
+        row_height = 22
+        header_height = 60
+        footer_height = 30
+        total_height = header_height + (len(self.horses) * row_height) + footer_height
+        panel_height = min(total_height, self.height - 100)
+        
+        # Use smaller font if many horses
+        if len(self.horses) > 8:
+            current_font = pygame.font.Font(None, 16)
+            row_height = 18
+        else:
+            current_font = self.font
+            row_height = 22
         
         # Panel background
         panel = pygame.Surface((panel_width, panel_height))
@@ -407,14 +439,14 @@ class HorseRaceGame:
         
         # Title
         title_font = pygame.font.Font(None, 24)
-        title = "🏆 LIVE RANKINGS 🏆"
+        title = "LIVE RANKINGS"
         text = title_font.render(title, True, COLORS['YELLOW'])
         self.screen.blit(text, (panel_x + 15, panel_y + 10))
         
-        # Headers
+        # Headers - simplified to show time only
         header_font = pygame.font.Font(None, 16)
-        headers = ["#", "Horse", "%", "Time", "R"]
-        x_pos = [panel_x + 15, panel_x + 60, panel_x + 110, panel_x + 160, panel_x + 220]
+        headers = ["Pos", "Horse", "Time", "Resets"]
+        x_pos = [panel_x + 15, panel_x + 75, panel_x + 145, panel_x + 220]
         
         for i, h in enumerate(headers):
             t = header_font.render(h, True, COLORS['GRAY'])
@@ -424,41 +456,72 @@ class HorseRaceGame:
                         (panel_x + 10, panel_y + 50), 
                         (panel_x + panel_width - 10, panel_y + 50), 1)
         
-        # Rankings
-        y = panel_y + 60
-        top = self.ranking_manager.get_top_horses(len(self.horses))
+        # Rankings - show ALL horses, sorted by finish time and checkpoint progress
+        y = panel_y + 55
         
-        for i, (score, hid) in enumerate(top):
-            stats = self.ranking_manager.get_horse_stats(hid)
+        # Sort horses: finished horses first (by finish time), then by checkpoint progress
+        def sort_key(horse):
+            stats = self.ranking_manager.get_horse_stats(horse.horse_id)
+            if stats and stats.finished and stats.finish_time is not None:
+                # Finished horses: use finish time (lower is better)
+                return (0, stats.finish_time, horse.horse_id)
+            else:
+                # Not finished: use negative checkpoint progress (higher is better)
+                return (1, -horse.current_checkpoint_index, horse.horse_id)
+        
+        sorted_horses = sorted(self.horses, key=sort_key)
+        
+        # Determine scroll if needed (simple - show all, but cap height)
+        max_visible = min(len(sorted_horses), (panel_height - 80) // row_height)
+        visible_horses = sorted_horses[:max_visible]
+        
+        for i, horse in enumerate(visible_horses):
+            stats = self.ranking_manager.get_horse_stats(horse.horse_id)
             if not stats:
                 continue
             
-            # Rank
-            rank = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else f"{i+1}."
+            # Rank number (actual position in race)
+            rank = i + 1
             
-            # Time
-            if stats.finish_time:
-                time_disp = f"{stats.finish_time:.1f}s"
+            # Display rank
+            rank_display = f"{rank}"
+            
+            # Time display - show completion time for finished horses
+            if stats.finished and stats.finish_time is not None:
+                # Show the actual finish time
+                time_disp = f"{stats.finish_time:.2f}s"
+                time_color = COLORS['GREEN']  # Green for finished horses
             else:
-                time_disp = "Racing"
+                # Show "---" for horses still racing
+                time_disp = "---"
+                time_color = COLORS['GRAY']  # Gray for unfinished
             
-            # Path %
-            pct = f"{stats.best_path_percentage:.0f}%" if stats.best_path_percentage > 0 else "-"
+            # Draw row with highlighting for selected horse
+            color = horse.color
+            if self.selected_horse == horse:
+                # Highlight selected horse
+                pygame.draw.rect(self.screen, (80, 80, 100), 
+                               (panel_x + 5, y - 2, panel_width - 10, row_height))
+                color = COLORS['YELLOW']
             
-            # Draw row
-            self.screen.blit(self.font.render(rank, True, COLORS['WHITE']), (x_pos[0], y))
-            self.screen.blit(self.font.render(f"{hid}", True, stats.color), (x_pos[1], y))
-            self.screen.blit(self.font.render(pct, True, COLORS['WHITE']), (x_pos[2], y))
-            self.screen.blit(self.font.render(time_disp, True, COLORS['WHITE']), (x_pos[3], y))
-            self.screen.blit(self.font.render(str(stats.reset_count), True, COLORS['WHITE']), (x_pos[4], y))
+            # Use appropriate font size
+            if len(self.horses) > 8:
+                text_surf = pygame.font.Font(None, 16)
+            else:
+                text_surf = self.font
             
-            y += 22
+            self.screen.blit(text_surf.render(rank_display, True, COLORS['WHITE']), (x_pos[0], y))
+            self.screen.blit(text_surf.render(f"{horse.horse_id}", True, color), (x_pos[1], y))
+            self.screen.blit(text_surf.render(time_disp, True, time_color), (x_pos[2], y))
+            self.screen.blit(text_surf.render(str(stats.reset_count), True, COLORS['WHITE']), (x_pos[3], y))
+            
+            y += row_height
         
         # Finished count
-        y += 5
-        finished_text = f"Finished: {len(self.finished_horses)}/{NUM_HORSES}"
-        self.screen.blit(self.font.render(finished_text, True, COLORS['WHITE']), 
-                        (panel_x + 15, y))
+        finished_count = sum(1 for horse in self.horses if horse.has_finished)
+        finished_text = f"Finished: {finished_count}/{NUM_HORSES}"
+        self.screen.blit(header_font.render(finished_text, True, COLORS['WHITE']), 
+                        (panel_x + 15, panel_y + panel_height - 25))
     
     def _draw_horse_info(self):
         if not self.selected_horse:
@@ -469,21 +532,22 @@ class HorseRaceGame:
         if not stats:
             return
         
-        panel = pygame.Surface((250, 150))
+        panel = pygame.Surface((250, 160))
         panel.set_alpha(200)
         panel.fill(COLORS['BLACK'])
         self.screen.blit(panel, (15, 70))
         
         y = 85
+        status = "FINISHED" if horse.has_finished else "RACING"
         info = [
-            f"Horse {horse.horse_id}",
+            f"Horse {horse.horse_id} - {status}",
             f"Speed: {horse.velocity.mag():.1f}",
-            f"CP: {horse.current_checkpoint_index + 1}/7",
+            f"Checkpoint: {horse.current_checkpoint_index + 1}/{horse.total_checkpoints}",
             f"Resets: {stats.reset_count}",
         ]
         
-        if stats.best_path_percentage > 0:
-            info.append(f"Best: {stats.best_path_percentage:.0f}%")
+        if horse.has_finished and stats.finish_time:
+            info.append(f"Finish Time: {stats.finish_time:.2f}s")
         
         for line in info:
             t = self.font.render(line, True, horse.color)

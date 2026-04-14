@@ -31,18 +31,16 @@ class RaceTrack:
         self.start_line_pos = self._get_point_on_edge('right', 0.1)  # Near top of right edge (START)
         self.finish_line_pos = self._get_point_on_edge('top', 0.9)   # Near right side of top edge (FINISH)
         
-        # Create visible checkpoints (none at start/finish)
-        self.checkpoints = self._create_checkpoints()
+        # Create visible checkpoints (including start and finish as checkpoints)
+        self.checkpoints = self._create_checkpoints_with_start_finish()
         self.checkpoint_positions = []
         self.checkpoint_radius = 40
         
         for cp in self.checkpoints:
             self.checkpoint_positions.append(Vector2(cp[0], cp[1]))
         
-        self.checkpoint_colors = [
-            (255, 0, 0), (255, 165, 0), (255, 255, 0), (0, 255, 0),
-            (0, 255, 255), (0, 0, 255), (128, 0, 128)
-        ]
+        # Colors for checkpoints (start=green, finish=red, others=rainbow)
+        self.checkpoint_colors = self._create_checkpoint_colors()
         
         # Fixed start positions
         self.fixed_start_positions = self._calculate_fixed_start_positions()
@@ -61,7 +59,7 @@ class RaceTrack:
         
         self.goal = Vector2(self.finish_line_pos[0], self.finish_line_pos[1])
         
-        # Create ideal path (square shape) - SINGLE CLEAR LINE
+        # Create ideal path (EMPTY - no line to follow)
         self.ideal_path = self._create_ideal_path()
         
         # Pre-render static elements
@@ -129,41 +127,9 @@ class RaceTrack:
         return (x, y)
     
     def _create_ideal_path(self) -> List[Vector2]:
-        """Create a SINGLE CLEAR ideal racing line (centered on square track)"""
-        ideal_points = []
-        
-        # Square dimensions (exactly centered on track)
-        left_x = self.width * 0.265  # Slightly inside the track
-        right_x = self.width * 0.535
-        top_y = self.height * 0.215
-        bottom_y = self.height * 0.785
-        
-        # Create points in clockwise order with enough points for smooth line
-        # Top edge
-        for i in range(20):
-            x = left_x + (right_x - left_x) * (i / 19)
-            y = top_y
-            ideal_points.append(Vector2(x, y))
-        
-        # Right edge
-        for i in range(1, 20):
-            x = right_x
-            y = top_y + (bottom_y - top_y) * (i / 19)
-            ideal_points.append(Vector2(x, y))
-        
-        # Bottom edge
-        for i in range(1, 20):
-            x = right_x - (right_x - left_x) * (i / 19)
-            y = bottom_y
-            ideal_points.append(Vector2(x, y))
-        
-        # Left edge
-        for i in range(1, 20):
-            x = left_x
-            y = bottom_y - (bottom_y - top_y) * (i / 19)
-            ideal_points.append(Vector2(x, y))
-        
-        return ideal_points
+        """Create an empty ideal path - horses only need to hit checkpoints in order"""
+        # Return empty list - no ideal path to follow
+        return []
     
     def _create_static_surfaces(self):
         """Pre-render static elements to surfaces"""
@@ -194,37 +160,16 @@ class RaceTrack:
         
         # Create a surface for text and overlays
         self.text_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        
-        # Draw start text (to the right of the start line on right edge)
-        if self.start_line_pos:
-            font = pygame.font.Font(None, 48)
-            text = font.render("START", True, COLORS['WHITE'])
-            outline = font.render("START", True, COLORS['BLACK'])
-            text_x = self.start_line_pos[0] + 30  # To the right of the track
-            text_y = self.start_line_pos[1] - 30
-            # Draw outline
-            for dx, dy in [(-2,-2), (-2,2), (2,-2), (2,2)]:
-                self.text_surface.blit(outline, (int(text_x + dx), int(text_y + dy)))
-            self.text_surface.blit(text, (int(text_x), int(text_y)))
-        
-        # Draw finish text (above the finish line on top edge)
-        if self.finish_line_pos:
-            font = pygame.font.Font(None, 48)
-            text = font.render("FINISH", True, COLORS['BLACK'])
-            outline = font.render("FINISH", True, COLORS['WHITE'])
-            text_x = self.finish_line_pos[0] - 70
-            text_y = self.finish_line_pos[1] - 60  # Above the track
-            # Draw outline
-            for dx, dy in [(-2,-2), (-2,2), (2,-2), (2,2)]:
-                self.text_surface.blit(outline, (int(text_x + dx), int(text_y + dy)))
-            self.text_surface.blit(text, (int(text_x), int(text_y)))
     
-    def _create_checkpoints(self) -> List[Tuple[float, float]]:
-        """Create 7 visible checkpoints in order: Start -> CP1 -> CP2 -> CP3 -> CP4 -> CP5 -> CP6 -> CP7 -> Finish"""
+    def _create_checkpoints_with_start_finish(self) -> List[Tuple[float, float]]:
+        """Create checkpoints including START and FINISH as checkpoints 0 and 8"""
         checkpoints = []
-        num_checkpoints = 7
         
-        # Calculate total points
+        # Add START as checkpoint 0
+        checkpoints.append(self.start_line_pos)
+        
+        # Add 7 intermediate checkpoints
+        num_intermediate = 7
         total_points = len(self.track_points)
         
         # Find the index closest to start position
@@ -237,14 +182,41 @@ class RaceTrack:
                 min_dist = dist
                 start_idx = i
         
-        # Place checkpoints evenly spaced after start (clockwise)
-        for i in range(1, num_checkpoints + 1):
+        # Place intermediate checkpoints evenly spaced after start (clockwise)
+        for i in range(1, num_intermediate + 1):
             # Calculate index offset from start
-            offset = int(i * (total_points / (num_checkpoints + 1)))
+            offset = int(i * (total_points / (num_intermediate + 1)))
             idx = (start_idx + offset) % total_points
             checkpoints.append(self.track_points[idx])
         
+        # Add FINISH as checkpoint 8 (last checkpoint)
+        checkpoints.append(self.finish_line_pos)
+        
         return checkpoints
+    
+    def _create_checkpoint_colors(self) -> List[Tuple[int, int, int]]:
+        """Create colors for checkpoints (0=start/green, 1-7=rainbow, 8=finish/red)"""
+        colors = []
+        
+        # Start checkpoint (index 0) - Green
+        colors.append((0, 255, 0))  # Bright green
+        
+        # Intermediate checkpoints (indices 1-7) - Rainbow
+        rainbow = [
+            (255, 0, 0),      # Red
+            (255, 165, 0),    # Orange
+            (255, 255, 0),    # Yellow
+            (0, 255, 0),      # Green
+            (0, 255, 255),    # Cyan
+            (0, 0, 255),      # Blue
+            (128, 0, 128)     # Purple
+        ]
+        colors.extend(rainbow)
+        
+        # Finish checkpoint (index 8) - Red
+        colors.append((255, 0, 0))  # Bright red
+        
+        return colors
     
     def _calculate_track_direction(self) -> List[Vector2]:
         """Calculate forward direction at each track point (clockwise)"""
@@ -291,7 +263,8 @@ class RaceTrack:
             # Wrap around
             short_segment = list(range(finish_idx, len(self.track_points))) + list(range(0, start_idx + 1))
         
-        barrier_width = 4
+        # Create a much narrower barrier that blocks the path but leaves the finish line accessible
+        barrier_width = 2  # Reduced from 4
         for idx in short_segment:
             point = self.track_points[idx]
             grid_x, grid_y = self.grid.world_to_grid(point[0], point[1])
@@ -299,8 +272,15 @@ class RaceTrack:
                 for dy in range(-barrier_width, barrier_width + 1):
                     nx, ny = grid_x + dx, grid_y + dy
                     if self.grid.is_valid_position(nx, ny):
+                        # Only block cells that are on the track and NOT at the finish line
                         if self.grid.get_node(nx, ny).state == NodeState.RACE_TRACK:
-                            self.grid.set_state(nx, ny, NodeState.UNWALKABLE)
+                            # Check if this cell is too close to the finish line
+                            world_x, world_y = self.grid.grid_to_world(nx, ny)
+                            dist_to_finish = distance(Vector2(world_x, world_y), 
+                                                    Vector2(self.finish_line_pos[0], self.finish_line_pos[1]))
+                            # Don't block cells very close to the finish line
+                            if dist_to_finish > 40:  # Leave a clear area around finish line
+                                self.grid.set_state(nx, ny, NodeState.UNWALKABLE)
     
     def _calculate_fixed_start_positions(self) -> List[Vector2]:
         """Pre-calculate fixed starting positions along the start line on the right edge"""
@@ -365,6 +345,10 @@ class RaceTrack:
     def get_checkpoint_color(self, index: int) -> Tuple[int, int, int]:
         return self.checkpoint_colors[index % len(self.checkpoint_colors)]
     
+    def get_total_checkpoints(self) -> int:
+        """Get total number of checkpoints (including start and finish)"""
+        return len(self.checkpoint_positions)
+    
     def is_position_on_track(self, pos: Vector2) -> bool:
         grid_x, grid_y = self.grid.world_to_grid(pos.x, pos.y)
         node = self.grid.get_node(grid_x, grid_y)
@@ -400,37 +384,8 @@ class RaceTrack:
         return True
     
     def calculate_path_percentage(self, path: List[Tuple[float, float]]) -> float:
-        """Optimized path percentage calculation"""
-        if not path or len(path) < 2:
-            return 0.0
-        
-        total_deviation = 0.0
-        sample_points = 0
-        
-        # Sample every 10th point for performance
-        step = max(1, len(path) // 20)
-        
-        for i in range(0, len(path), step):
-            point = Vector2(path[i][0], path[i][1])
-            
-            # Find closest point on ideal path
-            min_dist = float('inf')
-            for j in range(0, len(self.ideal_path), 4):
-                ideal = self.ideal_path[j]
-                dist = (point.x - ideal.x)**2 + (point.y - ideal.y)**2
-                if dist < min_dist:
-                    min_dist = dist
-            
-            total_deviation += math.sqrt(min_dist)
-            sample_points += 1
-        
-        if sample_points == 0:
-            return 0.0
-        
-        avg_deviation = total_deviation / sample_points
-        max_expected = TRACK_WIDTH / 2
-        percentage = max(0, 100 - (avg_deviation / max_expected * 100))
-        return min(100, percentage)
+        """Path percentage calculation removed - always returns 0"""
+        return 0.0
     
     def draw(self, screen, show_ideal_path=True):
         """Draw the square race track"""
@@ -440,30 +395,32 @@ class RaceTrack:
         # Draw the track surface (brown square)
         screen.blit(self.track_surface, (0, 0))
         
-        # Draw SINGLE CLEAR ideal path (bright cyan, solid line)
-        if show_ideal_path and len(self.ideal_path) > 1:
-            # Draw as a single continuous bright cyan line
-            for i in range(len(self.ideal_path) - 1):
-                start = self.ideal_path[i]
-                end = self.ideal_path[i + 1]
-                pygame.draw.line(screen, (0, 255, 255),  # Bright cyan
-                                (int(start.x), int(start.y)),
-                                (int(end.x), int(end.y)), 4)
-            
-            # Connect last point to first to close the loop
-            if len(self.ideal_path) > 2:
-                pygame.draw.line(screen, (0, 255, 255),
-                                (int(self.ideal_path[-1].x), int(self.ideal_path[-1].y)),
-                                (int(self.ideal_path[0].x), int(self.ideal_path[0].y)), 4)
+        # NO IDEAL PATH DRAWING - horses just need to hit checkpoints in order
         
         # Draw checkpoints (on top of track)
         for i, cp in enumerate(self.checkpoint_positions):
             color = self.get_checkpoint_color(i)
-            pygame.draw.circle(screen, color, (int(cp.x), int(cp.y)), 14, 0)
-            pygame.draw.circle(screen, COLORS['WHITE'], (int(cp.x), int(cp.y)), 14, 2)
             
-            font = pygame.font.Font(None, 20)
-            text = font.render(str(i + 1), True, COLORS['WHITE'])
+            # Draw different sizes for start/finish
+            if i == 0:  # Start checkpoint
+                radius = 18
+                pygame.draw.circle(screen, color, (int(cp.x), int(cp.y)), radius, 0)
+                pygame.draw.circle(screen, COLORS['WHITE'], (int(cp.x), int(cp.y)), radius, 3)
+                font = pygame.font.Font(None, 24)
+                text = font.render("S", True, COLORS['BLACK'])
+            elif i == len(self.checkpoint_positions) - 1:  # Finish checkpoint
+                radius = 18
+                pygame.draw.circle(screen, color, (int(cp.x), int(cp.y)), radius, 0)
+                pygame.draw.circle(screen, COLORS['WHITE'], (int(cp.x), int(cp.y)), radius, 3)
+                font = pygame.font.Font(None, 24)
+                text = font.render("F", True, COLORS['BLACK'])
+            else:  # Regular checkpoints
+                radius = 14
+                pygame.draw.circle(screen, color, (int(cp.x), int(cp.y)), radius, 0)
+                pygame.draw.circle(screen, COLORS['WHITE'], (int(cp.x), int(cp.y)), radius, 2)
+                font = pygame.font.Font(None, 20)
+                text = font.render(str(i), True, COLORS['WHITE'])
+            
             text_rect = text.get_rect(center=(int(cp.x), int(cp.y)))
             screen.blit(text, text_rect)
         
@@ -477,8 +434,26 @@ class RaceTrack:
                             (int(point[0]), int(point[1])),
                             (int(end_x), int(end_y)), 2)
         
-        # Draw text overlay (START/FINISH)
-        screen.blit(self.text_surface, (0, 0))
+        # Draw text overlay (START/FINISH labels)
+        if self.start_line_pos:
+            font = pygame.font.Font(None, 36)
+            text = font.render("START", True, COLORS['WHITE'])
+            outline = font.render("START", True, COLORS['BLACK'])
+            text_x = self.start_line_pos[0] + 40
+            text_y = self.start_line_pos[1] - 40
+            for dx, dy in [(-2,-2), (-2,2), (2,-2), (2,2)]:
+                screen.blit(outline, (int(text_x + dx), int(text_y + dy)))
+            screen.blit(text, (int(text_x), int(text_y)))
+        
+        if self.finish_line_pos:
+            font = pygame.font.Font(None, 36)
+            text = font.render("FINISH", True, COLORS['WHITE'])
+            outline = font.render("FINISH", True, COLORS['BLACK'])
+            text_x = self.finish_line_pos[0] - 90
+            text_y = self.finish_line_pos[1] - 70
+            for dx, dy in [(-2,-2), (-2,2), (2,-2), (2,2)]:
+                screen.blit(outline, (int(text_x + dx), int(text_y + dy)))
+            screen.blit(text, (int(text_x), int(text_y)))
         
         # Draw barriers
         self._draw_barriers(screen)

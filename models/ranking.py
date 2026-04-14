@@ -29,11 +29,6 @@ class HorseStats:
         self.finished = False  # Whether horse has completed the race
         self.paused_time = 0.0  # Track paused time for this horse
         
-        # NEW: Path accuracy tracking
-        self.path_percentage = 0.0  # How closely they follow ideal line
-        self.best_path_percentage = 0.0  # Best accuracy achieved
-        self.attempts = []  # List of (percentage, time) for each lap
-        
     def start_new_lap(self):
         """Called when horse starts a new lap"""
         self.current_lap_start_time = time.time()
@@ -46,13 +41,6 @@ class HorseStats:
         lap_time = time.time() - self.current_lap_start_time
         self.lap_times.append(lap_time)
         self.laps_completed += 1
-        
-        # Record path percentage for this lap
-        if path_percentage is not None:
-            self.path_percentage = path_percentage
-            if path_percentage > self.best_path_percentage:
-                self.best_path_percentage = path_percentage
-            self.attempts.append((path_percentage, lap_time))
         
         # Update best/worst/average
         if lap_time < self.best_lap_time:
@@ -88,7 +76,7 @@ class HorseStats:
         self.checkpoints_reached += 1
         
     def update_ranking_score(self):
-        """Calculate ranking score based on lap times, resets, and path accuracy"""
+        """Calculate ranking score based on lap times and resets only"""
         # Base score on finish time (if finished)
         if self.finish_time is not None:
             time_score = self.finish_time
@@ -108,22 +96,8 @@ class HorseStats:
         else:
             incomplete_penalty = 0.0
         
-        # NEW: Bonus for path accuracy (up to 20% reduction in score)
-        path_bonus = 0.0
-        if self.best_path_percentage > 0:
-            # Higher percentage = bigger bonus (max 20% reduction)
-            path_bonus = time_score * (self.best_path_percentage / 500)  # 100% = 20% reduction
+        self.ranking_score = time_score + reset_penalty + incomplete_penalty
         
-        self.ranking_score = time_score + reset_penalty + incomplete_penalty - path_bonus
-        
-    def get_attempts_summary(self, max_attempts: int = 3) -> List[str]:
-        """Get a summary of recent attempts"""
-        summary = []
-        recent = self.attempts[-max_attempts:] if self.attempts else []
-        for i, (percentage, lap_time) in enumerate(recent):
-            summary.append(f"  Attempt {len(self.attempts) - len(recent) + i + 1}: {percentage:.1f}% | {lap_time:.2f}s")
-        return summary
-    
     def get_stats_dict(self) -> Dict:
         """Get stats as dictionary for saving"""
         return {
@@ -140,9 +114,6 @@ class HorseStats:
             'checkpoints_reached': self.checkpoints_reached,
             'ranking_score': self.ranking_score,
             'finished': self.finished,
-            'path_percentage': self.path_percentage,
-            'best_path_percentage': self.best_path_percentage,
-            'attempts': self.attempts
         }
     
     def load_from_dict(self, data: Dict):
@@ -158,9 +129,6 @@ class HorseStats:
         self.checkpoints_reached = data.get('checkpoints_reached', 0)
         self.ranking_score = data.get('ranking_score', 0.0)
         self.finished = data.get('finished', False)
-        self.path_percentage = data.get('path_percentage', 0.0)
-        self.best_path_percentage = data.get('best_path_percentage', 0.0)
-        self.attempts = data.get('attempts', [])
 
 
 class RankingManager:
@@ -176,6 +144,7 @@ class RankingManager:
         self.paused = False
         self.pause_start_time = None
         self.total_paused_time = 0.0
+        self._final_time = None  # Store final race time
         self.load_rankings()
         
     def start_race(self):
@@ -184,6 +153,7 @@ class RankingManager:
         self.race_finished = False
         self.winner = None
         self.total_paused_time = 0.0
+        self._final_time = None
         for stats in self.horse_stats.values():
             stats.finished = False
             stats.finish_time = None
@@ -222,22 +192,35 @@ class RankingManager:
             
     def finish_race(self, horse_id: int, path_percentage: float = None):
         """Called when horse completes the race"""
-        if horse_id in self.horse_stats and not self.horse_stats[horse_id].finished:
-            self.horse_stats[horse_id].finish_race(path_percentage)
-            self.update_rankings()
-            self.save_rankings()
-            
-            # Check if this is the winner
-            if self.winner is None:
-                self.winner = horse_id
-                print(f"\n🏆 WINNER! Horse {horse_id} finished first in {self.horse_stats[horse_id].finish_time:.2f} seconds! 🏆")
-            
-            # Check if all horses have finished
-            all_finished = all(stats.finished for stats in self.horse_stats.values())
-            if all_finished:
-                self.race_finished = True
-                print("\n🏁 RACE COMPLETE! All horses have finished. 🏁")
-                self.print_final_results()
+        if horse_id in self.horse_stats:
+            stats = self.horse_stats[horse_id]
+            if not stats.finished:
+                # Record the finish time
+                if stats.current_lap_start_time:
+                    stats.finish_time = time.time() - stats.current_lap_start_time
+                else:
+                    # Fallback - use current race time
+                    stats.finish_time = self.get_race_time()
+                
+                stats.finished = True
+                stats.complete_lap(path_percentage)
+                self.update_rankings()
+                self.save_rankings()
+                
+                # Check if this is the winner
+                if self.winner is None:
+                    self.winner = horse_id
+                    print(f"\nWINNER! Horse {horse_id} finished first in {stats.finish_time:.2f} seconds!")
+                
+                # Check if all horses have finished
+                all_finished = all(stats.finished for stats in self.horse_stats.values())
+                if all_finished:
+                    self.race_finished = True
+                    # Store the final time
+                    self._final_time = self.get_race_time()
+                    print("\nRACE COMPLETE! All horses have finished.")
+                    print(f"Final race time: {self._final_time:.2f} seconds")
+                    self.print_final_results()
     
     def add_reset(self, horse_id: int):
         """Called when horse resets"""
@@ -279,11 +262,22 @@ class RankingManager:
     def get_horse_stats(self, horse_id: int) -> HorseStats:
         """Get stats for a specific horse"""
         return self.horse_stats.get(horse_id)
+    
+    def get_finish_time(self, horse_id: int) -> float:
+        """Get the finish time for a specific horse (None if not finished)"""
+        stats = self.horse_stats.get(horse_id)
+        if stats and stats.finished:
+            return stats.finish_time
+        return None
         
     def get_race_time(self) -> float:
         """Get current race time since start (accounting for pauses)"""
         if self.race_start_time is None:
             return 0.0
+        
+        # If race is finished, return the stored final time
+        if self.race_finished and self._final_time is not None:
+            return self._final_time
         
         if self.paused and self.pause_start_time:
             # If paused, return time up to pause start
@@ -333,12 +327,13 @@ class RankingManager:
         self.paused = False
         self.pause_start_time = None
         self.total_paused_time = 0.0
+        self._final_time = None
         self.save_rankings()
         
     def print_final_results(self):
-        """Print final race results"""
+        """Print final race results with numerical rankings"""
         print("\n" + "="*70)
-        print("🏁 FINAL RACE RESULTS 🏁")
+        print("FINAL RACE RESULTS")
         print("="*70)
         
         # Sort by finish time
@@ -347,8 +342,7 @@ class RankingManager:
         
         for i, (finish_time, hid) in enumerate(finished_horses):
             stats = self.horse_stats[hid]
-            medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else f"{i+1}."
-            print(f"{medal} Horse {hid:2d} | {stats.best_path_percentage:5.1f}% | {finish_time:7.2f}s | tries {stats.reset_count}")
+            print(f"{i+1:2d}. Horse {hid:2d} | {finish_time:7.2f}s | tries {stats.reset_count}")
         
         print("="*70)
         
@@ -357,6 +351,6 @@ class RankingManager:
         summary = []
         for i, (score, horse_id) in enumerate(self.rankings[:5]):  # Top 5
             stats = self.horse_stats[horse_id]
-            finish_str = f"{stats.finish_time:.2f}s" if stats.finish_time else "DNF"
-            summary.append(f"{i+1}. Horse {horse_id:2d} | {stats.best_path_percentage:5.1f}% | {finish_str} | tries {stats.reset_count}")
+            finish_str = f"{stats.finish_time:.2f}s" if stats.finish_time else "---"
+            summary.append(f"{i+1}. Horse {horse_id:2d} | {finish_str} | tries {stats.reset_count}")
         return summary

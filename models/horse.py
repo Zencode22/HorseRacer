@@ -51,11 +51,14 @@ class Horse:
         self.distance_traveled = 0
         self.laps_completed = 0
         
-        # Checkpoint tracking
+        # Checkpoint tracking - START is index 0, FINISH is last index
         self.current_checkpoint_index = 0
-        self.total_checkpoints = 7
+        self.total_checkpoints = 9  # Start (0) + 7 intermediate + Finish (8)
         self.checkpoint_reached_time = 0
         self.checkpoints_visited = []
+        
+        # NEW: Flag to indicate horse has finished the race
+        self.has_finished = False
         
         # Barrier memory (limited size for performance)
         self.barrier_memory = set()
@@ -94,11 +97,14 @@ class Horse:
         self.ranking_manager = None
         
     def set_target(self, target: Vector2, pathfinder):
+        # Don't set new targets if horse has finished
+        if self.has_finished:
+            return
         self.target = target
         self.request_new_path(pathfinder)
     
     def request_new_path(self, pathfinder):
-        if self.target is None:
+        if self.target is None or self.has_finished:
             return
         
         start = (self.position.x, self.position.y)
@@ -122,18 +128,28 @@ class Horse:
                     self.current_path.pop(0)
     
     def get_current_target(self) -> Optional[Vector2]:
+        # Return None if horse has finished
+        if self.has_finished:
+            return None
+            
         if not self.track or not hasattr(self.track, 'checkpoint_positions'):
             return self.target
         
+        # If we've reached the finish checkpoint, no target needed
         if self.current_checkpoint_index >= self.total_checkpoints:
-            return self.track.goal
+            return None
         
         return self.track.checkpoint_positions[self.current_checkpoint_index].copy()
     
     def update_checkpoint(self):
+        # Skip checkpoint updates if horse has finished
+        if self.has_finished:
+            return
+            
         if not self.track or not hasattr(self.track, 'checkpoint_positions'):
             return
         
+        # If we've already passed all checkpoints, don't continue
         if self.current_checkpoint_index >= self.total_checkpoints:
             return
         
@@ -142,30 +158,48 @@ class Horse:
         
         if dist < self.track.checkpoint_radius and self.checkpoint_reached_time == 0:
             self.checkpoints_visited.append(self.current_checkpoint_index)
-            print(f"Horse {self.horse_id} reached checkpoint {self.current_checkpoint_index + 1}")
+            
+            # Special messages for start and finish
+            if self.current_checkpoint_index == 0:
+                print(f"Horse {self.horse_id} passed START checkpoint!")
+            elif self.current_checkpoint_index == self.total_checkpoints - 1:
+                print(f"Horse {self.horse_id} reached FINISH checkpoint! Race complete!")
+                # Mark as finished immediately
+                self.mark_finished()
+                # Notify ranking manager about completion
+                if self.ranking_manager:
+                    self.ranking_manager.finish_race(self.horse_id)
+                return
+            else:
+                print(f"Horse {self.horse_id} reached checkpoint {self.current_checkpoint_index}")
             
             if self.ranking_manager:
                 self.ranking_manager.reached_checkpoint(self.horse_id)
             
-            # Store successful path
-            if len(self.current_path) > 0:
-                if hasattr(self.track, 'calculate_path_percentage'):
-                    pct = self.track.calculate_path_percentage(self.current_path)
-                    if self.current_checkpoint_index not in self.best_paths or pct > 50:
-                        self.best_paths[self.current_checkpoint_index] = self.current_path.copy()
-                        self.confidence_score = min(1.0, self.confidence_score + 0.2)
+            # Store successful path (simplified - no path percentage needed)
+            if len(self.current_path) > 0 and self.current_checkpoint_index < self.total_checkpoints - 1:
+                if self.current_checkpoint_index not in self.best_paths:
+                    self.best_paths[self.current_checkpoint_index] = self.current_path.copy()
+                    self.confidence_score = min(1.0, self.confidence_score + 0.2)
             
             self.barrier_memory.clear()
             self.consecutive_barrier_hits = 0
             self.stuck_timer = 0
             self.wrong_direction_penalty = 0
             
+            # Move to next checkpoint
             self.current_checkpoint_index += 1
             self.checkpoint_reached_time = 20
             
+            # Check if this was the finish checkpoint
             if self.current_checkpoint_index >= self.total_checkpoints:
-                self.target = self.track.goal
+                # Horse has completed the race!
+                self.mark_finished()
+                if self.ranking_manager:
+                    self.ranking_manager.finish_race(self.horse_id)
+                return
             else:
+                # Set target to next checkpoint
                 self.target = self.track.checkpoint_positions[self.current_checkpoint_index]
             
             if hasattr(self, 'track') and self.track:
@@ -175,6 +209,10 @@ class Horse:
             self.checkpoint_reached_time -= 1
     
     def check_if_stuck(self) -> bool:
+        # Never consider a finished horse as stuck
+        if self.has_finished:
+            return False
+            
         if self.reset_cooldown > 0:
             self.reset_cooldown -= 1
             return False
@@ -199,6 +237,10 @@ class Horse:
         return False
     
     def reset_to_start(self):
+        # Don't reset if horse has finished
+        if self.has_finished:
+            return
+            
         if not self.track:
             return
         
@@ -215,6 +257,7 @@ class Horse:
         forward = self.track.get_forward_direction(self.position)
         self.velocity = Vector2(forward.x * 2, forward.y * 2)
         
+        # Reset to START checkpoint (index 0)
         self.current_checkpoint_index = 0
         self.checkpoint_reached_time = 0
         self.checkpoints_visited = []
@@ -230,22 +273,39 @@ class Horse:
             self.target = self.track.checkpoint_positions[0]
             self.request_new_path(self.track.pathfinder)
     
+    def mark_finished(self):
+        """Mark the horse as finished the race"""
+        self.has_finished = True
+        self.velocity = Vector2(0, 0)
+        self.target = None
+        self.current_path = []
+        print(f"Horse {self.horse_id} has finished the race and stopped!")
+    
     def update_path_history(self):
+        # Don't update path history if finished (optional - can keep to show final position)
         self.path_history.append((self.position.x, self.position.y))
         if len(self.path_history) > self.path_history_max:
             self.path_history.pop(0)
     
     def flock(self, horses: List['Horse'], pathfinder=None):
+        # Don't do anything if horse has finished
+        if self.has_finished:
+            return
+            
         # Update position history
         self.update_path_history()
         
-        # Check if stuck
+        # Check if stuck (but not if finished)
         if self.check_if_stuck():
             self.reset_to_start()
             return
         
         # Update checkpoint
         self.update_checkpoint()
+        
+        # If we just finished, don't apply any more forces
+        if self.has_finished:
+            return
         
         # Calculate forces (optimized - only separation and path following)
         sep = self.separation(horses)
@@ -311,16 +371,25 @@ class Horse:
         return steer
     
     def attract_to_checkpoint(self) -> Vector2:
+        # Don't attract to checkpoint if finished
+        if self.has_finished:
+            return Vector2(0, 0)
+            
         if not self.track or not hasattr(self.track, 'checkpoint_positions'):
             return Vector2(0, 0)
         
+        # If we've passed all checkpoints, no attraction
         if self.current_checkpoint_index >= self.total_checkpoints:
-            return self.seek(self.track.goal)
+            return Vector2(0, 0)
         
         checkpoint = self.track.checkpoint_positions[self.current_checkpoint_index]
         return self.seek(checkpoint)
     
     def attract_to_track(self) -> Vector2:
+        # Still attract to track even if finished? Probably not needed
+        if self.has_finished:
+            return Vector2(0, 0)
+            
         if not self.track:
             return Vector2(0, 0)
         
@@ -330,6 +399,10 @@ class Horse:
         return Vector2(0, 0)
     
     def avoid_barriers(self) -> Vector2:
+        # Don't avoid barriers if finished
+        if self.has_finished:
+            return Vector2(0, 0)
+            
         if not self.track or not hasattr(self.track, 'grid'):
             return Vector2(0, 0)
         
@@ -388,6 +461,10 @@ class Horse:
         return steer
     
     def enforce_clockwise(self) -> Vector2:
+        # Don't enforce direction if finished
+        if self.has_finished:
+            return Vector2(0, 0)
+            
         if not self.track:
             return Vector2(0, 0)
         
@@ -466,8 +543,8 @@ class Horse:
         # Update path history
         self.update_path_history()
         
-        # Update distance for ranking
-        if self.ranking_manager:
+        # Update distance for ranking (only if not finished)
+        if self.ranking_manager and not self.has_finished:
             moved = distance(self.position, old_pos)
             self.ranking_manager.update_distance(self.horse_id, moved)
         
@@ -482,8 +559,8 @@ class Horse:
         elif self.position.y > h:
             self.position.y = 0
         
-        # Track confinement
-        if track and hasattr(track, 'is_position_on_track'):
+        # Track confinement (skip if finished)
+        if track and hasattr(track, 'is_position_on_track') and not self.has_finished:
             if not track.is_position_on_track(self.position):
                 nearest = track.get_nearest_track_position(self.position)
                 if distance(self.position, nearest) > 50:
@@ -503,7 +580,19 @@ class Horse:
                                 (int(start[0]), int(start[1])),
                                 (int(end[0]), int(end[1])), 1)
         
-        # Draw horse
+        # Draw horse - if finished, draw a special marker
+        if self.has_finished:
+            # Draw a "finished" marker (star or circle with F)
+            pygame.draw.circle(screen, COLORS['YELLOW'], 
+                              (int(self.position.x), int(self.position.y)), self.size + 5, 3)
+            pygame.draw.circle(screen, self.color, 
+                              (int(self.position.x), int(self.position.y)), self.size, 0)
+            font = pygame.font.Font(None, 16)
+            text = font.render("F", True, COLORS['BLACK'])
+            text_rect = text.get_rect(center=(int(self.position.x), int(self.position.y)))
+            screen.blit(text, text_rect)
+            return
+            
         if self.velocity.mag() < 0.1:
             return
             
