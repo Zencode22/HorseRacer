@@ -14,3 +14,13 @@ TRACK_WIDTH = 90  # Slightly reduced to fit smaller screen
 
 # Game settings
 LAPS_TO_WIN = 1  # Race ends after one lap
+
+# Horse names - 5 letters, Derby themed
+HORSE_NAMES = [
+    "DASHER",   # Fast runner
+    "BOLTO",    # Lightning bolt
+    "STORM",    # Storm runner
+    "FLASH",    # Quick flash
+    "RACER",    # Pure racer
+    "ZIPPY"     # Quick and zippy
+]
