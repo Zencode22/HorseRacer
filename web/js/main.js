@@ -21,23 +21,29 @@ import { BettingSystem } from './betting.js';
 const HORSE_COLORS = [COLORS.RED, COLORS.BLUE, COLORS.YELLOW, COLORS.PURPLE, COLORS.ORANGE, '#e8e8e8'];
 
 export class DerbyGame {
-  // bootBets / bootBalance / bootChip / bootLog come from js/boot.js: the
-  // player places bets on the classic-script betting screen BEFORE this
-  // module is even loaded (dynamic import), so we adopt them here.
-  constructor(canvas, bootBets = null, bootBalance = null, bootChip = null, bootLog = null) {
+  // bootState comes from js/boot.js: the player places bets on the classic
+  // script betting screen BEFORE this module is even loaded (dynamic
+  // import), so we adopt balance + wagers here and carry them straight
+  // into the first race.
+  constructor(canvas, bootState = null) {
+    const boot = bootState || {};
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.track = new RaceTrack(WIDTH, HEIGHT);
 
     this.memory = loadMemory();
-    this.betting = new BettingSystem(bootBalance);
+    this.betting = new BettingSystem(boot.balance);
 
     // Bets placed on the classic-script boot screen (js/boot.js) before this
-    // module was dynamically imported — adopt them so the player's wagers
-    // carry straight into the first race.
-    if (bootBets && Object.keys(bootBets).length) {
-      for (const [k, v] of Object.entries(bootBets)) this.betting.placeBet(k, v);
-      this._adoptedBootBets = true;
+    // module was dynamically imported. NOTE: placeBet() checks affordability
+    // against balance MINUS what is already wagered, so we must deduct each
+    // adopted bet from the spendable balance ourselves as we go — otherwise
+    // only the first carried-over bet would ever be accepted.
+    if (boot.bets && Object.keys(boot.bets).length) {
+      for (const [k, v] of Object.entries(boot.bets)) {
+        if (this.betting.placeBet(k, v)) this.betting.balance -= v;
+      }
+      this._adoptedBootBets = Object.keys(this.betting.bets).length > 0;
     } else {
       this._adoptedBootBets = false;
     }
@@ -54,7 +60,7 @@ export class DerbyGame {
 
     // state machine: 'betting' | 'racing' | 'results'
     this.state = 'betting';
-    this.selectedChip = bootChip || 25;
+    this.selectedChip = boot.chip || 25;
     this.raceFinishedCount = 0;
     this.order = [];          // finish order (horse names)
     this.settlement = null;   // last payout info
@@ -170,6 +176,9 @@ export class DerbyGame {
     this._adoptedBootBets = false;
     this._finishDeferredSetup(); // idempotent safety net
     this.resetHorsesToStart();
+    // Fresh race clock: horses measure finish times against track.simTime,
+    // so stamp every racer's start time AFTER resetting them to the line.
+    for (const h of this.horses) h.raceStartTime = null;
     for (const h of this.horses) {
       h.raceStartTime = this.track.simTime;
       h.requestNewPath(this.track.pathfinder); // lazy first path, now racing
@@ -200,6 +209,27 @@ export class DerbyGame {
 
   update(dt) {
     if (this.state !== 'racing') return;
+    // Guard: a horse stuck mid-circuit can stall the whole race forever.
+    // If no new finisher has appeared for a long stretch, force-close the
+    // race with whatever order we have (the rest are marked finished) so
+    // the game always returns to the betting window instead of hanging on
+    // "RACING" with an empty loading screen.
+    if (this.raceFinishedCount < this.order.length) this._noProgressTimer = 0;
+    else this._noProgressTimer += dt;
+    if (this.order.length > 0 && this.raceFinishedCount < NUM_HORSES &&
+        this._noProgressTimer > 45) {
+      for (const h of this.horses) {
+        if (!h.hasFinished) {
+          h.markFinished();
+          // A DNF horse must not poison the learning data with a bogus
+          // (huge) finish time — record it as a reset-heavy run instead.
+          h.finishTime = null;
+          this.order.push(h.name);
+          this.raceFinishedCount += 1;
+        }
+      }
+    }
+
     this.track.simTime += 1 / 60; // fixed timestep keeps physics stable
     this.tick();
   }
