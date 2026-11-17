@@ -1,22 +1,25 @@
-# 🏇 Horse Racer - A* Pathfinding & Flocking Simulation
+# 🏇 Horse Racer - A* Pathfinding & Flocking Simulation (HTML Browser Edition)
 
-A pygame-based horse racing simulation featuring autonomous AI horses that navigate a square race track using A* pathfinding and Boids flocking algorithms. Watch six uniquely named horses compete, learn from their mistakes, and race to the finish!
+An **HTML5 / JavaScript** browser game featuring autonomous AI horses that navigate a square race track using A* pathfinding and Boids flocking algorithms. Watch six uniquely named horses compete, learn from their past runs, place bets with fake money, and race to the finish — all inside your web browser. No Python, no installs, no dependencies.
+
+> This project was rewritten from the original pygame desktop game into a pure web application. The old Python source is preserved in `legacy_python/` for reference only.
 
 ---
 
 ## 🎮 Quick Start
 
-### Option 1: Standalone Executable (No Python Required)
-1. Download `HorseRacer.exe` from the latest [GitHub Release](https://github.com/conno/Codes/releases)
-2. Double-click to run — the game starts immediately!
-
-### Option 2: Run from Source
 ```bash
-pip install -r requirements.txt
-python main.py
+# Option 1: just open the file
+open web/index.html          # macOS
+xdg-open web/index.html      # Linux
+start web\index.html         # Windows
+
+# Option 2: serve it (recommended - ES modules need http:// in some browsers)
+python3 -m http.server 8000 --directory web
+# then visit http://localhost:8000
 ```
 
-**Requirements:** Python 3.7+ | Pygame 2.0+
+**Requirements:** Any modern browser (Chrome, Firefox, Safari, Edge). That's it.
 
 ---
 
@@ -24,23 +27,37 @@ python main.py
 
 | Input | Action |
 |-------|--------|
-| **Mouse Click** | Select a horse to view stats |
-| **R Key** | Reset the race at any time |
-| **Reset Button** | Click the on-screen button to restart |
-| **Q Key** | Quit after race finishes (when prompted) |
+| **Mouse Click on a horse** (betting phase) | Place a chip bet on that horse |
+| **+ / − buttons** | Add / remove bets per horse |
+| **START RACE button** or **SPACE** | Begin the race |
+| **R Key** | Reset the current race to the start line |
+| **NEXT RACE NOW** button | Skip the results board, return to betting |
+| **Chip size selector** | Choose $10 / $25 / $50 / $100 chips |
+| **Wipe All Horse Memory** | Make every horse forget its past runs |
 
 ---
 
 ## 🏁 How It Works
 
-The race begins automatically. Six horses start staggered along the right side of a square track and must navigate **9 checkpoints** in clockwise order to complete one lap. Each horse is an independent AI agent that:
+Each meeting follows a loop: **Betting → Racing → Results → repeat.**
+
+Six horses start staggered along the right side of a square track and must navigate **9 checkpoints** in clockwise order to complete one lap. Each horse is an independent AI agent that:
 
 - Builds an **A* path** from its current position to the next checkpoint
 - Uses **flocking behaviors** to avoid collisions with other horses
 - **Remembers barriers** it hits to avoid them in future attempts
+- **Remembers every past race** (times, best racing lines) via `localStorage` and gets faster with experience
 - **Auto-resets** if it gets stuck or goes the wrong way
 
-The race ends when all horses finish. Results are displayed on screen and saved to `horse_rankings.json`.
+The race ends when all horses finish; results are shown on screen and winnings are paid out pari-mutuel style.
+
+---
+
+## 💰 Betting System
+
+- Bankroll starts at **$500** (fake money), held in `sessionStorage` so it resets when the tab closes.
+- Place chips on any horse during the betting window; odds are computed from each horse's remembered performance.
+- Payouts use a pari-mutuel pool with an 8% house takeout.
 
 ---
 
@@ -54,7 +71,7 @@ Each horse uses the A* algorithm to find the most direct route along the track w
 - **Optimizations:** Path caching, line-of-sight smoothing, barrier memory
 
 ### Flocking (Boids)
-Inspired by Craig Reynolds' Boids algorithm, each horse balances five simultaneous steering forces:
+Inspired by Craig Reynolds' Boids algorithm, each horse balances several simultaneous steering forces:
 
 | Force | Weight | Purpose |
 |-------|--------|---------|
@@ -67,17 +84,19 @@ Inspired by Craig Reynolds' Boids algorithm, each horse balances five simultaneo
 
 Forces are combined into a single steering vector each frame. Horses that hit too many barriers, stop moving, or go the wrong way too long will **automatically reset** to the starting line.
 
+### Persistent Learning
+After every race each horse's stats (runs, wins, average/best time, skill, preferred lines) are saved to `localStorage`. Higher-skill horses run faster, so tracks get quicker over time until you wipe their memory.
+
 ---
 
-## 📊 Live Rankings
+## 📊 Live Standings
 
-A ranking panel on the right side of the screen shows real-time standings:
+The sidebar shows real-time info per horse:
 
-- Finished horses sort by time
-- Racing horses sort by checkpoints reached
-- Reset count is tracked per horse
-
-Click any horse to see its name, speed, current checkpoint, and reset count.
+- Runs completed, wins, best time, recent times
+- Current decimal odds derived from remembered performance
+- Your wager on each horse and running bankroll
+- Recent payout log
 
 ---
 
@@ -85,29 +104,28 @@ Click any horse to see its name, speed, current checkpoint, and reset count.
 
 ```
 HorseRacer/
-├── main.py                     # Game entry point
-├── config.py                   # Settings: FPS, track size, horse names
-├── horse_rankings.json         # Persistent race results
-├── requirements.txt            # Python dependencies
+├── web/                        # THE GAME (HTML/CSS/JS, zero dependencies)
+│   ├── index.html              # Page + UI panel markup
+│   ├── style.css               # Styling for the page and panels
+│   └── js/
+│       ├── config.js           # Settings: canvas size, horse names, colors, keys
+│       ├── main.js             # Game loop, state machine, HUD, DOM wiring
+│       ├── horse.js            # AI agent: flocking + pathfollowing + learning
+│       ├── track.js            # Square track, checkpoints, barriers
+│       ├── grid.js             # Grid system for A* pathfinding
+│       ├── astar.js            # A* algorithm implementation
+│       ├── vector2.js          # 2D vector math library
+│       ├── memory.js           # Persistent horse memory + odds/skill model
+│       └── betting.js          # Fake-money bankroll & pari-mutuel payouts
 │
-├── game/
-│   └── horse_race_game.py      # Main loop, UI, event handling
+├── tests/
+│   └── harness.js              # Headless Node simulation test (run: node tests/harness.js)
 │
-├── models/
-│   ├── horse.py                # AI agent with flocking + pathfinding
-│   ├── grid.py                 # Grid system for A* pathfinding
-│   ├── node.py                 # Node class (walkable/unwalkable states)
-│   ├── vector2.py              # 2D vector math library
-│   └── ranking.py              # Statistics tracking and persistence
-│
-├── pathfinding/
-│   └── astar.py                # A* algorithm implementation
-│
-├── track/
-│   └── race_track.py           # Square track, checkpoints, barriers
-│
-└── utils/
-    └── colors.py               # RGB color definitions
+└── legacy_python/              # Original pygame desktop version (kept for reference)
+    ├── main.py                 # Old entry point
+    ├── config.py               # Old settings
+    ├── game/ models/ pathfinding/ track/ utils/
+    └── HorseRacer.spec requirements.txt horse_rankings.json
 ```
 
 ---
@@ -129,21 +147,34 @@ Each horse has the same AI but different starting positions, leading to emergent
 
 ## ⚙️ Configuration
 
-Edit `config.py` to customize:
+Edit `web/js/config.js` to customize:
 
-```python
-WIDTH, HEIGHT = 1280, 720   # Window size
-FPS = 60                     # Frame rate
-NUM_HORSES = 6               # Number of racers
-LAPS_TO_WIN = 1              # Laps required to finish
-HORSE_NAMES = ["DASHER", "BOLTO", "STORM", "FLASH", "RACER", "ZIPPY"]
+```js
+export const WIDTH = 1280;   // Canvas width
+export const HEIGHT = 720;   // Canvas height
+export const FPS = 60;       // Frame rate
+export const NUM_HORSES = 6; // Number of racers
+export const STARTING_BALANCE = 500;
+export const HORSE_NAMES = ['DASHER', 'BOLTO', 'STORM', 'FLASH', 'RACER', 'ZIPPY'];
 ```
+
+---
+
+## ✅ Testing
+
+The simulation logic can be verified headlessly without a browser:
+
+```bash
+node tests/harness.js
+```
+
+It runs full races, checks that all horses complete the checkpoint circuit (no soft-locks), that the learning/skill system improves horses, and that betting probabilities sum to 1.
 
 ---
 
 ## ⚠️ Development Attribution
 
-- **Code Generation:** Core game logic, pathfinding algorithms, and agent behaviors were generated with assistance from DeepSeek AI.
+- **Code Generation:** Core game logic, pathfinding algorithms, and agent behaviors were generated with assistance from DeepSeek AI; the browser port rewrites the pygame original in HTML/Canvas/ES modules.
 - **Documentation:** This README was written by Lumo (Proton's AI assistant).
 
 *This project is an educational example of human-AI collaborative software development.*
@@ -160,14 +191,9 @@ This project is for educational purposes. Feel free to modify, extend, and learn
 
 - **A* Algorithm:** Based on Unity pathfinding tutorial logic
 - **Flocking Behavior:** Craig Reynolds' Boids algorithm (1986)
-- **Graphics:** Pygame rendering library
+- **Graphics:** HTML5 Canvas 2D rendering (replacing Pygame)
 - **AI Assistance:** DeepSeek (code generation), Lumo (documentation)
 
 ---
 
 *Built for learning game AI and emergent behavior through human-AI collaboration*
-- **Flocking:** Craig Reynolds' Boids algorithm
-- **Graphics:** Pygame rendering library
-
----
-*Built with ❤️ for learning game AI and pathfinding algorithms through human-AI collaboration*
