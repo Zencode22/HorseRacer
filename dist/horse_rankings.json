@@ -1,0 +1,136 @@
+{
+  "horses": {
+    "808": {
+      "horse_id": 808,
+      "name": "DASHER",
+      "color": [
+        255,
+        0,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1630.8808241186023,
+      "lap_times": [
+        7.604824066162109
+      ],
+      "finish_time": 7.604823112487793,
+      "best_lap_time": 7.604824066162109,
+      "worst_lap_time": 7.604824066162109,
+      "average_lap_time": 7.604824066162109,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.604823112487793,
+      "finished": true
+    },
+    "840": {
+      "horse_id": 840,
+      "name": "BOLTO",
+      "color": [
+        0,
+        0,
+        255
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1648.8539344996404,
+      "lap_times": [
+        7.741633653640747
+      ],
+      "finish_time": 7.741626024246216,
+      "best_lap_time": 7.741633653640747,
+      "worst_lap_time": 7.741633653640747,
+      "average_lap_time": 7.741633653640747,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.741626024246216,
+      "finished": true
+    },
+    "160": {
+      "horse_id": 160,
+      "name": "STORM",
+      "color": [
+        255,
+        255,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1667.1181590676456,
+      "lap_times": [
+        7.774889945983887
+      ],
+      "finish_time": 7.774888753890991,
+      "best_lap_time": 7.774889945983887,
+      "worst_lap_time": 7.774889945983887,
+      "average_lap_time": 7.774889945983887,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.774888753890991,
+      "finished": true
+    },
+    "480": {
+      "horse_id": 480,
+      "name": "FLASH",
+      "color": [
+        128,
+        0,
+        128
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1646.1948549149076,
+      "lap_times": [
+        7.571744918823242
+      ],
+      "finish_time": 7.571744203567505,
+      "best_lap_time": 7.571744918823242,
+      "worst_lap_time": 7.571744918823242,
+      "average_lap_time": 7.571744918823242,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.571744203567505,
+      "finished": true
+    },
+    "800": {
+      "horse_id": 800,
+      "name": "RACER",
+      "color": [
+        255,
+        165,
+        0
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1618.6116012098253,
+      "lap_times": [
+        7.359534502029419
+      ],
+      "finish_time": 7.359533786773682,
+      "best_lap_time": 7.359534502029419,
+      "worst_lap_time": 7.359534502029419,
+      "average_lap_time": 7.359534502029419,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.359533786773682,
+      "finished": true
+    },
+    "120": {
+      "horse_id": 120,
+      "name": "ZIPPY",
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "laps_completed": 1,
+      "reset_count": 1,
+      "total_distance": 1638.269689404507,
+      "lap_times": [
+        7.810830593109131
+      ],
+      "finish_time": 7.810829401016235,
+      "best_lap_time": 7.810830593109131,
+      "worst_lap_time": 7.810830593109131,
+      "average_lap_time": 7.810830593109131,
+      "checkpoints_reached": 9,
+      "ranking_score": 12.810829401016235,
+      "finished": true
+    }
+  }
+}
