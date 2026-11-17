@@ -9,8 +9,8 @@
 import { STARTING_BALANCE, BET_CHIP_VALUES, BALANCE_KEY } from './config.js';
 
 export class BettingSystem {
-  constructor() {
-    this.balance = this._loadBalance();
+  constructor(overrideBalance = null) {
+    this.balance = overrideBalance != null ? overrideBalance : this._loadBalance();
     this.bets = {};          // horseName -> amount wagered this race
     this.lastResults = null; // payout summary of previous race
     this.history = [];       // recent race results for the UI log
