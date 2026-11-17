@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Horse Race Derby — Browser Edition</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🏇 HORSE RACE DERBY</h1>
+    <div class="bank">
+      Bankroll: <span id="balance">$500</span>
+      &nbsp;·&nbsp; Wagered: <span id="total-bet">$0</span>
+    </div>
+  </header>
+
+  <main>
+    <canvas id="game" width="1280" height="720"></canvas>
+
+    <section id="panel">
+      <div id="betting-window">
+        <div class="panel-head">
+          <h2>Betting Window</h2>
+          <label class="chip-label">Chip size:
+            <select id="chip-select">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          <button id="start-race" class="primary">🏇 START RACE</button>
+          <button id="clear-bets">Clear Bets</button>
+        </div>
+        <div id="bet-rows"><!-- populated by JS --></div>
+      </div>
+
+      <aside id="sidebar">
+        <h2>Memory &amp; Bank</h2>
+        <p class="hint">
+          Horses recall every past run (times, best line) and get faster with
+          experience. Memory is saved in this browser between races.
+        </p>
+        <button id="wipe-memory" class="danger">🧠 Wipe All Horse Memory</button>
+        <label class="chk">
+          <input type="checkbox" id="wipe-on-exit" checked />
+          Wipe all memory when the program is exited / tab closed
+        </label>
+        <button id="reset-bank">Reset Bankroll ($500)</button>
+        <h3>Recent Payouts</h3>
+        <ul id="bet-log"></ul>
+      </aside>
+    </section>
+
+    <footer id="status-line">Loading…</footer>
+  </main>
+
+  <script type="module">
+    import { DerbyGame } from './js/main.js';
+    const game = new DerbyGame(document.getElementById('game'));
+    game.enableAutoWipeOnExit(); // default: wipe memory on exit (checkbox reflects it)
+    game.start();
+    window.__derby = game; // handy for debugging
+  </script>
+</body>
+</html>
