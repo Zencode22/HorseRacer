@@ -64,6 +64,22 @@
     <p id="loading-text">Preparing the derby…</p>
   </div>
 
+  <script>
+    // Watchdog: if the game module never boots (network hiccup, old browser
+    // without ES-module support, syntax error), don't leave the user staring
+    // at a spinner for minutes — show a clear message after 8 seconds.
+    window.__derbyBooted = false;
+    setTimeout(function () {
+      if (window.__derbyBooted) return;
+      var t = document.getElementById('loading-text');
+      if (t && !t.dataset.msg) {
+        t.dataset.msg = '1';
+        t.innerHTML = 'The game failed to start.<br>' +
+          'Try refreshing the page, or serve this folder over HTTP ' +
+          '(<code>python3 -m http.server</code> in the <code>web/</code> directory).';
+      }
+    }, 8000);
+  </script>
   <script type="module">
     import { DerbyGame } from './js/main.js';
 
@@ -79,6 +95,7 @@
         game.enableAutoWipeOnExit(); // default: wipe memory on exit (checkbox reflects it)
         game.start();
         window.__derby = game; // handy for debugging
+        window.__derbyBooted = true;
       } catch (err) {
         console.error(err);
         loadingText.textContent = 'Failed to start: ' + err.message;
@@ -86,6 +103,7 @@
         return;
       }
       // Hide the overlay once the first frame has actually been drawn.
+      // (main.js also hides it right after its own first painted frame.)
       requestAnimationFrame(() => requestAnimationFrame(() => {
         overlay.classList.add('hidden');
         status.textContent = 'Ready.';

@@ -13,7 +13,7 @@ import { Vector2 } from './vector2.js';
 import { RaceTrack } from './track.js';
 import { Horse } from './horse.js';
 import {
-  loadMemory, saveMemory, getRecord, recordFinish, wipeMemory,
+  loadMemory, saveMemory, flushMemory, getRecord, recordFinish, wipeMemory,
   winProbability, oddsFromProb, predictedTime, computeSkill,
 } from './memory.js';
 import { BettingSystem } from './betting.js';
@@ -178,6 +178,7 @@ export class DerbyGame {
 
   finishRace() {
     this.state = 'results';
+    flushMemory(); // persist the whole race's learning in ONE debounced write
     const winner = this.order[0];
     if (this.betting.totalWagered > 0) {
       this.settlement = this.betting.settle(winner);
@@ -201,6 +202,7 @@ export class DerbyGame {
   wipeAllMemory() {
     if (!confirm('Wipe ALL horse memories? Every horse forgets its past runs and resets to rookie form.')) return;
     wipeMemory(this.memory, HORSE_NAMES);
+    flushMemory(); // user action: persist immediately, don't wait for debounce
     for (const h of this.horses) {
       h.preferredLine = {};
       h.applySkill(0);
@@ -227,6 +229,25 @@ export class DerbyGame {
   // ------------------------------------------------------------------ loop --
 
   start() {
+    // LOAD PERFORMANCE: never let a slow/failed module evaluation leave the
+    // loading overlay up forever. If no first frame has painted within 5s we
+    // surface a clear message + recovery action instead of an endless spinner.
+    this._firstFrameDone = false;
+    setTimeout(() => {
+      if (this._firstFrameDone) return;
+      const overlay = document.getElementById('loading-overlay');
+      const text = document.getElementById('loading-text');
+      if (overlay && !overlay.classList.contains('hidden') && text) {
+        text.innerHTML = 'Still loading after 5 seconds? <br>' +
+          '<button id="force-start" style="margin-top:10px">Retry now</button>';
+        const btn = document.getElementById('force-start');
+        if (btn) btn.addEventListener('click', () => {
+          try { this._finishDeferredSetup(); this.draw(); } catch (e) { console.error(e); }
+          overlay.classList.add('hidden');
+        });
+      }
+    }, 5000);
+
     const step = (now) => {
       const dt = Math.min(0.05, (now - this.lastFrame) / 1000);
       this.lastFrame = now;
@@ -243,6 +264,13 @@ export class DerbyGame {
 
       this.draw();
       this.updateLiveUI();
+      if (!this._firstFrameDone) {
+        this._firstFrameDone = true;
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        const statusEl = document.getElementById('status-line');
+        if (statusEl) statusEl.textContent = 'Ready.';
+      }
       this.raf = requestAnimationFrame(step);
     };
     this.raf = requestAnimationFrame(step);
