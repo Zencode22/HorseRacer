@@ -21,13 +21,26 @@ import { BettingSystem } from './betting.js';
 const HORSE_COLORS = [COLORS.RED, COLORS.BLUE, COLORS.YELLOW, COLORS.PURPLE, COLORS.ORANGE, '#e8e8e8'];
 
 export class DerbyGame {
-  constructor(canvas) {
+  // bootBets / bootBalance / bootChip / bootLog come from js/boot.js: the
+  // player places bets on the classic-script betting screen BEFORE this
+  // module is even loaded (dynamic import), so we adopt them here.
+  constructor(canvas, bootBets = null, bootBalance = null, bootChip = null, bootLog = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.track = new RaceTrack(WIDTH, HEIGHT);
 
     this.memory = loadMemory();
-    this.betting = new BettingSystem();
+    this.betting = new BettingSystem(bootBalance);
+
+    // Bets placed on the classic-script boot screen (js/boot.js) before this
+    // module was dynamically imported — adopt them so the player's wagers
+    // carry straight into the first race.
+    if (bootBets && Object.keys(bootBets).length) {
+      for (const [k, v] of Object.entries(bootBets)) this.betting.placeBet(k, v);
+      this._adoptedBootBets = true;
+    } else {
+      this._adoptedBootBets = false;
+    }
 
     this.horses = [];
     const starts = this.track.getSpreadStartPositions(NUM_HORSES);
@@ -41,7 +54,7 @@ export class DerbyGame {
 
     // state machine: 'betting' | 'racing' | 'results'
     this.state = 'betting';
-    this.selectedChip = 25;
+    this.selectedChip = bootChip || 25;
     this.raceFinishedCount = 0;
     this.order = [];          // finish order (horse names)
     this.settlement = null;   // last payout info
@@ -151,6 +164,10 @@ export class DerbyGame {
 
   startRace() {
     if (this.state === 'racing') return;
+    // The player pressed START on the boot screen: skip the betting phase,
+    // jump straight into the race with the adopted bets.
+    const hadBootBets = this._adoptedBootBets && Object.keys(this.betting.bets).length > 0;
+    this._adoptedBootBets = false;
     this._finishDeferredSetup(); // idempotent safety net
     this.resetHorsesToStart();
     for (const h of this.horses) {
@@ -161,6 +178,17 @@ export class DerbyGame {
     this.raceFinishedCount = 0;
     this.recomputeOdds();
     this.updateUI();
+    if (hadBootBets) {
+      const parts = [];
+      for (const [k, v] of Object.entries(this.betting.bets)) parts.push(`${k} $${v}`);
+      this.setStatus('Race started — your bets: ' + parts.join(', '));
+    } else {
+      this.setStatus('Race started — no bets placed.');
+    }
+  }
+
+  setStatus(msg) {
+    if (this.el && this.el.status) this.el.status.textContent = msg;
   }
 
   recomputeOdds() {
@@ -547,4 +575,30 @@ export class DerbyGame {
     }
     if (this.el.status.textContent !== msg) this.el.status.textContent = msg;
   }
+}
+
+// ============================================================================
+// AUTO-START: js/boot.js dynamically imports this module when the player
+// presses START RACE on the classic betting screen. Booting the full game
+// immediately skips the redundant second betting phase — the race starts at
+// once with whatever wagers were carried over from the boot screen.
+// ============================================================================
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    const boot = window.__derbyBoot || {};
+    if (!boot.requested) return; // normal load: wait for a later START press
+    try {
+      const canvas = document.getElementById('game');
+      const game = new DerbyGame(canvas, boot.bets, boot.balance, boot.chip);
+      game.enableAutoWipeOnExit(!!boot.wipeOnExit);
+      window.__derby = game;      // signal to boot.js: full mode is live
+      window.__derbyMode = 'full';
+      window.__derbyBooted = true;
+      game.startRace();           // betting -> racing right away
+      game.start();               // begin the render/sim loop
+    } catch (err) {
+      console.error(err);
+      window.__derbyBootFailed = err; // boot.js polls this and falls back to lite
+    }
+  });
 }

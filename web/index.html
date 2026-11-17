@@ -64,51 +64,13 @@
     <p id="loading-text">Preparing the derby…</p>
   </div>
 
-  <script>
-    // Watchdog: if the game module never boots (network hiccup, old browser
-    // without ES-module support, syntax error), don't leave the user staring
-    // at a spinner for minutes — show a clear message after 8 seconds.
-    window.__derbyBooted = false;
-    setTimeout(function () {
-      if (window.__derbyBooted) return;
-      var t = document.getElementById('loading-text');
-      if (t && !t.dataset.msg) {
-        t.dataset.msg = '1';
-        t.innerHTML = 'The game failed to start.<br>' +
-          'Try refreshing the page, or serve this folder over HTTP ' +
-          '(<code>python3 -m http.server</code> in the <code>web/</code> directory).';
-      }
-    }, 8000);
-  </script>
-  <script type="module">
-    import { DerbyGame } from './js/main.js';
-
-    const status = document.getElementById('status-line');
-    const overlay = document.getElementById('loading-overlay');
-    const loadingText = document.getElementById('loading-text');
-
-    // Defer module evaluation work to the next macrotask so the HTML above
-    // paints before any game code runs.
-    setTimeout(() => {
-      try {
-        const game = new DerbyGame(document.getElementById('game'));
-        game.enableAutoWipeOnExit(); // default: wipe memory on exit (checkbox reflects it)
-        game.start();
-        window.__derby = game; // handy for debugging
-        window.__derbyBooted = true;
-      } catch (err) {
-        console.error(err);
-        loadingText.textContent = 'Failed to start: ' + err.message;
-        status.textContent = 'Error starting game — see console.';
-        return;
-      }
-      // Hide the overlay once the first frame has actually been drawn.
-      // (main.js also hides it right after its own first painted frame.)
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        overlay.classList.add('hidden');
-        status.textContent = 'Ready.';
-      }));
-    }, 0);
-  </script>
+  <!-- Boot script: classic (non-module) JavaScript so the game works even
+       when opened directly from disk via file:// — browsers block ES-module
+       imports on that protocol, which is what used to cause
+       "The game failed to start." Instead of importing main.js statically,
+       we load it with a dynamic import() only when the game actually starts
+       (START RACE / SPACE), and fall back to an inline classic-script mini
+       game if that fetch fails (e.g. file:// CORS restrictions). -->
+  <script src="js/boot.js"></script>
 </body>
 </html>
