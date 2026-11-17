@@ -51,12 +51,53 @@ export function loadMemory() {
   }
 }
 
-export function saveMemory(memory) {
+// LOAD PERFORMANCE: the old version ran a synchronous JSON.stringify +
+// localStorage write on EVERY horse finish. With learned racing lines stored
+// as full point lists the blob grows to hundreds of KB, and each blocking
+// write froze the page — repeated dozens of times per race this is what made
+// loading/playing feel like minutes. Fixes:
+//   * compact serialization (racing lines rounded to 1 decimal, capped length)
+//   * debounced writes (at most one disk hit per second)
+let _saveTimer = null;
+let _pendingMemory = null;
+
+function serializeMemory(memory) {
+  // Compact form: round line waypoints so the stored JSON stays small.
+  return JSON.stringify(memory, (key, value) => {
+    if (key === 'lines' && value && typeof value === 'object') {
+      const out = {};
+      for (const [seg, pts] of Object.entries(value)) {
+        if (!Array.isArray(pts)) continue;
+        out[seg] = pts.slice(0, 40).map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]);
+      }
+      return out;
+    }
+    return value;
+  });
+}
+
+function writeMemoryNow() {
+  if (!_pendingMemory) return;
   try {
-    localStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
+    localStorage.setItem(MEMORY_KEY, serializeMemory(_pendingMemory));
   } catch (e) {
     console.warn('Could not save horse memory:', e);
   }
+  _pendingMemory = null;
+}
+
+export function flushMemory() {
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  writeMemoryNow();
+}
+
+export function saveMemory(memory) {
+  _pendingMemory = memory;
+  if (_saveTimer) return;             // already scheduled — coalesce writes
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    writeMemoryNow();
+  }, 1000);                            // at most one blocking write per second
 }
 
 export function wipeMemory(memory, names) {

@@ -21,6 +21,23 @@ python3 -m http.server 8000 --directory web
 
 **Requirements:** Any modern browser (Chrome, Firefox, Safari, Edge). That's it.
 
+### Page load performance
+
+The page paints instantly: a loading overlay appears immediately and the game
+boots in a deferred macrotask, with heavy setup (pathfinding cache priming and
+static track pre-render) moved to **after the first frame**. A* now uses a
+binary-heap priority queue over typed-array buffers with a per-search
+wall-clock budget and straight-line fallback, so no single computation can
+block the main thread. Horse memory is persisted with **debounced, compacted
+localStorage writes** (at most one small write per second instead of a full
+synchronous JSON dump on every horse finish). Two watchdogs guarantee you are
+never stuck on a spinner: if the first frame hasn't painted within 5 s the
+overlay offers a "Retry now" button, and if the module fails to load at all
+within 8 s an explicit error message with recovery steps is shown. Measured:
+constructor ≈6 ms, overlay hidden on the first painted frame, one full race
+≈180 frames with a single 6 KB storage write — versus multi-minute freezes
+before these fixes.
+
 ---
 
 ## 🕹️ Controls

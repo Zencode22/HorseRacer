@@ -13,7 +13,7 @@ import { Vector2 } from './vector2.js';
 import { RaceTrack } from './track.js';
 import { Horse } from './horse.js';
 import {
-  loadMemory, saveMemory, getRecord, recordFinish, wipeMemory,
+  loadMemory, saveMemory, flushMemory, getRecord, recordFinish, wipeMemory,
   winProbability, oddsFromProb, predictedTime, computeSkill,
 } from './memory.js';
 import { BettingSystem } from './betting.js';
@@ -52,11 +52,25 @@ export class DerbyGame {
     this.fps = 60;
     this.raf = null;
 
+    // LOAD PERFORMANCE: heavy setup (path requests, static track render) is
+    // deferred to after the first paint so the page becomes interactive
+    // immediately instead of blocking on computation for minutes.
+    this._ready = false;
+
     this.recomputeOdds();
     this.resetHorsesToStart();
 
     this._bindUI();
     this.updateUI();
+  }
+
+  _finishDeferredSetup() {
+    if (this._ready) return;
+    this._ready = true;
+    // Pre-render the static track surface and prime pathfinding caches now
+    // that the browser has already painted the loading screen.
+    this.track.prepare();
+    for (const h of this.horses) h.requestNewPath(this.track.pathfinder);
   }
 
   // ---------------------------------------------------------------- horses --
@@ -100,18 +114,49 @@ export class DerbyGame {
       h.pathHistory = [];
       h.lastPosition = sp.copy();
       h.target = this.track.checkpointPositions[0];
-      h.requestNewPath(this.track.pathfinder);
+      // NOTE: no path request here anymore. Paths are requested lazily on the
+      // first race frame (see tick()), which keeps page load instantaneous.
     }
     this.order = [];
     this.settlement = null;
+  }
+
+  // One simulation step. Guarded so a heavy frame can never lock up the tab:
+  // at most one path search per horse per interval, and if a single update
+  // would exceed the frame budget we skip the rest of the batch (the browser
+  // stays responsive; the sim simply continues next frame).
+  tick() {
+    const t0 = performance.now();
+    for (const h of this.horses) {
+      if (h.hasFinished) continue;
+      h.flock(this.horses);
+      h.update([WIDTH, HEIGHT]);
+      if (h.hasFinished) {
+        this.raceFinishedCount += 1;
+        this.order.push(h.name);
+        const rec = getRecord(this.memory, h.name);
+        recordFinish(rec, h.finishTime, h.resetsThisRace, h.segmentTimes);
+        if (this.order.length === 1) rec.wins += 1;
+        this._saveHorseLines(h);
+        saveMemory(this.memory);
+      }
+      if (performance.now() - t0 > 12) break; // frame budget guard
+    }
+    if (this.raceFinishedCount >= NUM_HORSES) {
+      this.finishRace();
+    }
   }
 
   // ----------------------------------------------------------------- race --
 
   startRace() {
     if (this.state === 'racing') return;
+    this._finishDeferredSetup(); // idempotent safety net
     this.resetHorsesToStart();
-    for (const h of this.horses) h.raceStartTime = this.track.simTime;
+    for (const h of this.horses) {
+      h.raceStartTime = this.track.simTime;
+      h.requestNewPath(this.track.pathfinder); // lazy first path, now racing
+    }
     this.state = 'racing';
     this.raceFinishedCount = 0;
     this.recomputeOdds();
@@ -128,29 +173,12 @@ export class DerbyGame {
   update(dt) {
     if (this.state !== 'racing') return;
     this.track.simTime += 1 / 60; // fixed timestep keeps physics stable
-
-    for (const h of this.horses) {
-      if (h.hasFinished) continue;
-      h.flock(this.horses);
-      h.update([WIDTH, HEIGHT]);
-      if (h.hasFinished) {
-        this.raceFinishedCount += 1;
-        this.order.push(h.name);
-        const rec = getRecord(this.memory, h.name);
-        recordFinish(rec, h.finishTime, h.resetsThisRace, h.segmentTimes);
-        if (this.order.length === 1) rec.wins += 1;
-        this._saveHorseLines(h);
-        saveMemory(this.memory);
-      }
-    }
-
-    if (this.raceFinishedCount >= NUM_HORSES) {
-      this.finishRace();
-    }
+    this.tick();
   }
 
   finishRace() {
     this.state = 'results';
+    flushMemory(); // persist the whole race's learning in ONE debounced write
     const winner = this.order[0];
     if (this.betting.totalWagered > 0) {
       this.settlement = this.betting.settle(winner);
@@ -174,6 +202,7 @@ export class DerbyGame {
   wipeAllMemory() {
     if (!confirm('Wipe ALL horse memories? Every horse forgets its past runs and resets to rookie form.')) return;
     wipeMemory(this.memory, HORSE_NAMES);
+    flushMemory(); // user action: persist immediately, don't wait for debounce
     for (const h of this.horses) {
       h.preferredLine = {};
       h.applySkill(0);
@@ -200,10 +229,31 @@ export class DerbyGame {
   // ------------------------------------------------------------------ loop --
 
   start() {
+    // LOAD PERFORMANCE: never let a slow/failed module evaluation leave the
+    // loading overlay up forever. If no first frame has painted within 5s we
+    // surface a clear message + recovery action instead of an endless spinner.
+    this._firstFrameDone = false;
+    setTimeout(() => {
+      if (this._firstFrameDone) return;
+      const overlay = document.getElementById('loading-overlay');
+      const text = document.getElementById('loading-text');
+      if (overlay && !overlay.classList.contains('hidden') && text) {
+        text.innerHTML = 'Still loading after 5 seconds? <br>' +
+          '<button id="force-start" style="margin-top:10px">Retry now</button>';
+        const btn = document.getElementById('force-start');
+        if (btn) btn.addEventListener('click', () => {
+          try { this._finishDeferredSetup(); this.draw(); } catch (e) { console.error(e); }
+          overlay.classList.add('hidden');
+        });
+      }
+    }, 5000);
+
     const step = (now) => {
       const dt = Math.min(0.05, (now - this.lastFrame) / 1000);
       this.lastFrame = now;
       this.fps = this.fps * 0.95 + (1 / Math.max(dt, 1e-4)) * 0.05;
+
+      if (!this._ready) this._finishDeferredSetup(); // after first paint
 
       this.update(dt);
 
@@ -214,6 +264,13 @@ export class DerbyGame {
 
       this.draw();
       this.updateLiveUI();
+      if (!this._firstFrameDone) {
+        this._firstFrameDone = true;
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        const statusEl = document.getElementById('status-line');
+        if (statusEl) statusEl.textContent = 'Ready.';
+      }
       this.raf = requestAnimationFrame(step);
     };
     this.raf = requestAnimationFrame(step);

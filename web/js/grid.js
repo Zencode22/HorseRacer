@@ -10,15 +10,24 @@ export class Grid {
     this.width = width;
     this.height = height;
     this.nodeSize = nodeSize;
-    // state[x][y]
+    // state[x][y] — flat Uint8Array backing view for O(1) resets and fast
+    // neighbor lookups during pathfinding (was a jagged array of Arrays).
+    this.flat = new Uint8Array(width * height);
     this.state = [];
     for (let x = 0; x < width; x++) {
-      this.state.push(new Array(height).fill(NodeState.UNWALKABLE));
+      const col = new Array(height).fill(NodeState.UNWALKABLE);
+      this.state.push(col);
     }
   }
 
+  _syncCol(x) {
+    const col = this.state[x];
+    const off = x * this.height;
+    for (let y = 0; y < this.height; y++) this.flat[off + y] = col[y];
+  }
+
   setState(x, y, st) {
-    if (this.isValidPosition(x, y)) this.state[x][y] = st;
+    if (this.isValidPosition(x, y)) { this.state[x][y] = st; this.flat[x * this.height + y] = st; }
   }
 
   getNode(x, y) {
@@ -44,9 +53,9 @@ export class Grid {
   createTrackBarriers(trackPoints, trackWidth) {
     if (trackPoints.length < 2) return;
 
-    for (let x = 0; x < this.width; x++)
-      for (let y = 0; y < this.height; y++)
-        this.state[x][y] = NodeState.UNWALKABLE;
+    // O(1) full reset via the typed array (was a nested loop over ~6k cells).
+    this.flat.fill(NodeState.UNWALKABLE);
+    for (let x = 0; x < this.width; x++) this.state[x].fill(NodeState.UNWALKABLE);
 
     for (let i = 0; i < trackPoints.length; i++) {
       const p1 = trackPoints[i];
@@ -60,12 +69,19 @@ export class Grid {
   _markTrackWidth(start, end, width) {
     const points = this._getLinePoints(start[0], start[1], end[0], end[1]);
     const radiusCells = Math.max(1, Math.floor(width / (2 * this.nodeSize)));
+    const r2 = radiusCells * radiusCells;
     for (const [x, y] of points) {
-      for (let dx = -radiusCells; dx <= radiusCells; dx++) {
-        for (let dy = -radiusCells; dy <= radiusCells; dy++) {
-          const nx = x + dx, ny = y + dy;
-          if (this.isValidPosition(nx, ny) && dx * dx + dy * dy <= radiusCells * radiusCells) {
-            this.state[nx][ny] = NodeState.RACE_TRACK;
+      const xLo = Math.max(0, x - radiusCells), xHi = Math.min(this.width - 1, x + radiusCells);
+      const yLo = Math.max(0, y - radiusCells), yHi = Math.min(this.height - 1, y + radiusCells);
+      for (let nx = xLo; nx <= xHi; nx++) {
+        const col = this.state[nx];
+        const ddx = nx - x;
+        const base = nx * this.height;
+        for (let ny = yLo; ny <= yHi; ny++) {
+          const ddy = ny - y;
+          if (ddx * ddx + ddy * ddy <= r2) {
+            col[ny] = NodeState.RACE_TRACK;
+            this.flat[base + ny] = NodeState.RACE_TRACK;
           }
         }
       }
