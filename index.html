@@ -1,0 +1,2057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🏇 Horse Race Derby — A* Pathfinding &amp; Flocking Simulation</title>
+<style>
+/* ========================================================================
+   HORSE RACE DERBY — page styles (all inlined: this file is self-contained)
+   ======================================================================== */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #14100c;
+  color: #eee;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: linear-gradient(#3e2b1a, #2a1d11);
+  border-bottom: 3px solid #ffd60a;
+}
+
+header h1 { margin: 0; font-size: 22px; letter-spacing: 2px; color: #ffd60a; }
+.bank { font-size: 16px; }
+#balance { color: #7cfc00; font-weight: bold; font-size: 18px; }
+#total-bet { color: #ffb340; font-weight: bold; }
+
+main { max-width: 1300px; margin: 0 auto; padding: 10px; }
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 3px solid #a0522d;
+  border-radius: 6px;
+  background: #000;
+}
+
+#panel {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+#betting-window, #sidebar {
+  background: #241a10;
+  border: 2px solid #654321;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.panel-head h2 { margin: 0 12px 0 0; font-size: 18px; color: #ffd60a; }
+
+button {
+  background: #4a331d;
+  color: #fff;
+  border: 2px solid #8a6a3f;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: #6b4a28; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: #1d6b2f; border-color: #2fae4c; font-weight: bold; }
+button.primary:hover:not(:disabled) { background: #248a3c; }
+button.danger { background: #7a1f1f; border-color: #c0392b; }
+button.danger:hover { background: #9c2929; }
+
+select {
+  background: #1a120a;
+  color: #fff;
+  border: 2px solid #8a6a3f;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+.bet-row {
+  display: grid;
+  grid-template-columns: 18px 80px 1fr 60px 70px 44px 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #3a2a18;
+}
+.bet-row:hover { background: #2e2114; }
+
+.swatch { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #000; }
+.hname { font-weight: bold; font-family: monospace; font-size: 15px; }
+.hstats { color: #bdb3a4; font-size: 12.5px; font-family: monospace; }
+.odds { color: #ffd60a; font-family: monospace; text-align: right; }
+.betamt { color: #7cfc00; font-family: monospace; text-align: right; min-height: 1em; }
+
+.chip-btn {
+  width: 40px;
+  padding: 6px 0;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 50%;
+  background: #1d6b2f;
+  border: 2px dashed #ffd60a;
+}
+.chip-btn.small { background: #5a2020; border-color: #ff8080; }
+
+#sidebar h2 { margin: 0 0 6px; font-size: 16px; color: #ffd60a; }
+#sidebar h3 { margin: 12px 0 4px; font-size: 14px; color: #deb887; }
+#sidebar button { width: 100%; margin-top: 8px; }
+.chk { display: block; margin-top: 10px; font-size: 12.5px; color: #cbbfae; }
+
+.hint { font-size: 12.5px; color: #a99c8a; margin: 6px 0; }
+
+#bet-log { list-style: none; margin: 0; padding: 0; font-size: 12px; font-family: monospace; }
+#bet-log li { padding: 3px 0; border-bottom: 1px dotted #3a2a18; color: #bdb3a4; }
+#bet-log li.win { color: #7cfc00; }
+#bet-log li.lose { color: #ff8080; }
+
+#status-line {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #1a120a;
+  border: 1px solid #654321;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #deb887;
+}
+
+@media (max-width: 900px) {
+  #panel { grid-template-columns: 1fr; }
+  .bet-row { grid-template-columns: 18px 70px 1fr 50px 40px 40px; }
+  .betamt { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏇 HORSE RACE DERBY</h1>
+  <div class="bank">
+    Bankroll: <span id="balance">$500</span>
+    &nbsp;·&nbsp; Wagered: <span id="total-bet">$0</span>
+  </div>
+</header>
+
+<main>
+  <canvas id="game" width="1280" height="720"></canvas>
+
+  <section id="panel">
+    <div id="betting-window">
+      <div class="panel-head">
+        <h2>Betting Window</h2>
+        <label class="chip-label">Chip size:
+          <select id="chip-select">
+            <option value="10">$10</option>
+            <option value="25" selected>$25</option>
+            <option value="50">$50</option>
+            <option value="100">$100</option>
+          </select>
+        </label>
+        <button id="start-race" class="primary">🏇 START RACE</button>
+        <button id="clear-bets">Clear Bets</button>
+      </div>
+      <div id="bet-rows"><!-- populated by JS --></div>
+    </div>
+
+    <aside id="sidebar">
+      <h2>Memory &amp; Bank</h2>
+      <p class="hint">
+        Horses recall every past run (times, best line) and get faster with
+        experience. Memory is saved in this browser between races.
+      </p>
+      <button id="wipe-memory" class="danger">🧠 Wipe All Horse Memory</button>
+      <label class="chk">
+        <input type="checkbox" id="wipe-on-exit" checked />
+        Wipe all memory when the program is exited / tab closed
+      </label>
+      <button id="reset-bank">Reset Bankroll ($500)</button>
+      <h3>Recent Payouts</h3>
+      <ul id="bet-log"></ul>
+    </aside>
+  </section>
+
+  <footer id="status-line">Loading…</footer>
+</main>
+
+<script>
+// ===========================================================================
+// HORSE RACE DERBY — single-file HTML game. Zero dependencies, works even
+// when opened straight from disk (file://).
+//
+//   Betting → Racing (A* pathfinding + boids flocking) → Results → repeat
+//
+// Sections:
+//   1. Configuration          5. A* pathfinding (heap + typed arrays)
+//   2. Vector math            6. Horse memory (localStorage learning)
+//   3. Grid                   7. Betting (pari-mutuel, sessionStorage)
+//   4. Race track             8. Horse AI agent + game loop / UI
+// ===========================================================================
+(function () {
+  'use strict';
+
+  // ------------------------------------------------------------------ 1. CONFIG
+  const WIDTH = 1280;
+  const HEIGHT = 720;
+  const NUM_HORSES = 6;
+  const TRACK_WIDTH = 90;
+  const STARTING_BALANCE = 500;
+  const BET_CHIP_VALUES = [10, 25, 50, 100];
+  const TOTAL_CHECKPOINTS = 9;
+  const MEMORY_KEY = 'horseDerbyMemory';    // horse memories (localStorage)
+  const BALANCE_KEY = 'horseDerbyBalance';  // bankroll (sessionStorage: wiped on exit)
+
+  const HORSE_NAMES = ['DASHER', 'BOLTO', 'STORM', 'FLASH', 'RACER', 'ZIPPY'];
+  const COLORS = {
+    BLACK: '#000000', WHITE: '#ffffff', GREEN: '#228b22', BROWN: '#8b4513',
+    RED: '#ff3b30', BLUE: '#3b82f6', YELLOW: '#ffd60a', PURPLE: '#a855f7',
+    ORANGE: '#ff9500', LIGHT_BROWN: '#deb887', DARK_BROWN: '#654321', WOOD: '#a0522d',
+  };
+  const HORSE_COLORS = [COLORS.RED, COLORS.BLUE, COLORS.YELLOW, COLORS.PURPLE, COLORS.ORANGE, '#e8e8e8'];
+
+  // ------------------------------------------------------------- 2. VECTOR MATH
+  class Vector2 {
+    constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+    add(o) { this.x += o.x; this.y += o.y; return this; }
+    sub(o) { this.x -= o.x; this.y -= o.y; return this; }
+    mult(s) { this.x *= s; this.y *= s; return this; }
+    div(s) { if (s !== 0) { this.x /= s; this.y /= s; } return this; }
+    mag() { return Math.hypot(this.x, this.y); }
+    normalize() { const m = this.mag(); if (m > 0) this.div(m); return this; }
+    limit(max) { if (this.mag() > max) { this.normalize(); this.mult(max); } return this; }
+    copy() { return new Vector2(this.x, this.y); }
+    distanceTo(o) { return Math.hypot(this.x - o.x, this.y - o.y); }
+  }
+  function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function hashString(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return Math.abs(h);
+  }
+
+  // -------------------------------------------------------------------- 3. GRID
+  // NodeState: 0 = UNWALKABLE, 1 = RACE_TRACK
+  const NodeState = { UNWALKABLE: 0, RACE_TRACK: 1 };
+
+  class Grid {
+    constructor(width, height, nodeSize = 10.0) {
+      this.width = width;
+      this.height = height;
+      this.nodeSize = nodeSize;
+      this.state = [];
+      for (let x = 0; x < width; x++) {
+        this.state.push(new Array(height).fill(NodeState.UNWALKABLE));
+      }
+    }
+    setState(x, y, st) {
+      if (this.isValidPosition(x, y)) this.state[x][y] = st;
+    }
+    getNode(x, y) {
+      return this.isValidPosition(x, y) ? this.state[x][y] : null;
+    }
+    isValidPosition(x, y) {
+      return x >= 0 && x < this.width && y >= 0 && y < this.height;
+    }
+    worldToGrid(wx, wy) {
+      let gx = Math.floor(wx / this.nodeSize);
+      let gy = Math.floor(wy / this.nodeSize);
+      gx = Math.max(0, Math.min(gx, this.width - 1));
+      gy = Math.max(0, Math.min(gy, this.height - 1));
+      return [gx, gy];
+    }
+    gridToWorld(gx, gy) {
+      return [gx * this.nodeSize + this.nodeSize / 2, gy * this.nodeSize + this.nodeSize / 2];
+    }
+    createTrackBarriers(trackPoints, trackWidth) {
+      if (trackPoints.length < 2) return;
+      for (let x = 0; x < this.width; x++) this.state[x].fill(NodeState.UNWALKABLE);
+      for (let i = 0; i < trackPoints.length; i++) {
+        const p1 = trackPoints[i];
+        const p2 = trackPoints[(i + 1) % trackPoints.length];
+        const a = this.worldToGrid(p1[0], p1[1]);
+        const b = this.worldToGrid(p2[0], p2[1]);
+        this._markTrackWidth(a, b, trackWidth);
+      }
+    }
+    _markTrackWidth(start, end, width) {
+      const points = this._getLinePoints(start[0], start[1], end[0], end[1]);
+      const radiusCells = Math.max(1, Math.floor(width / (2 * this.nodeSize)));
+      const r2 = radiusCells * radiusCells;
+      for (const [x, y] of points) {
+        const xLo = Math.max(0, x - radiusCells), xHi = Math.min(this.width - 1, x + radiusCells);
+        const yLo = Math.max(0, y - radiusCells), yHi = Math.min(this.height - 1, y + radiusCells);
+        for (let nx = xLo; nx <= xHi; nx++) {
+          const col = this.state[nx];
+          const ddx = nx - x;
+          for (let ny = yLo; ny <= yHi; ny++) {
+            const ddy = ny - y;
+            if (ddx * ddx + ddy * ddy <= r2) col[ny] = NodeState.RACE_TRACK;
+          }
+        }
+      }
+    }
+    _getLinePoints(x0, y0, x1, y1) {
+      // Bresenham's line algorithm
+      const points = [];
+      const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+      const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+      let err = dx + dy;
+      for (;;) {
+        points.push([x0, y0]);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) { if (x0 === x1) break; err += dy; x0 += sx; }
+        if (e2 <= dx) { if (y0 === y1) break; err += dx; y0 += sy; }
+      }
+      return points;
+    }
+  }
+
+  // --------------------------------------------------------------- 4. RACE TRACK
+  // Square track, clockwise circuit, 9 ordered checkpoints. The grid keeps
+  // only the plain track ring walkable; wrong-direction shortcuts are
+  // prevented by ordered checkpoints + a clockwise steering force.
+  class RaceTrack {
+    constructor(width = WIDTH, height = HEIGHT) {
+      this.width = width;
+      this.height = height;
+
+      this.trackPoints = this._createSquareTrack();
+      this.trackDirection = this._calculateTrackDirection();
+
+      // Start and finish on the SAME CORNER (top-right)
+      this.startLinePos = this._getPointOnEdge('right', 0.1);
+      this.finishLinePos = this._getPointOnEdge('top', 0.9);
+
+      this.checkpoints = this._createCheckpointsWithStartFinish();
+      this.checkpointPositions = this.checkpoints.map((cp) => new Vector2(cp[0], cp[1]));
+      this.checkpointRadius = 40;
+      this.checkpointColors = this._createCheckpointColors();
+
+      this.fixedStartPositions = this._calculateFixedStartPositions();
+
+      const nodeSize = 12.0;
+      this.grid = new Grid(Math.floor(width / nodeSize), Math.floor(height / nodeSize), nodeSize);
+      this.grid.createTrackBarriers(this.trackPoints, TRACK_WIDTH);
+
+      this.pathfinder = new Pathfinding(this.grid);
+      this.goal = new Vector2(this.finishLinePos[0], this.finishLinePos[1]);
+
+      // Static surface is built lazily (see prepare()) so constructing the
+      // track during page load stays cheap.
+      this.staticSurface = null;
+
+      // Shared simulation clock (seconds) so finish times are real seconds.
+      this.simTime = 0;
+    }
+
+    // Build the pre-rendered background once. Called after first paint.
+    prepare() {
+      if (this._prepared) return;
+      this._prepared = true;
+      this.staticSurface = this._createStaticSurface();
+    }
+
+    _createSquareTrack() {
+      const points = [];
+      const lx = this.width * 0.25, rx = this.width * 0.55;
+      const ty = this.height * 0.2, by = this.height * 0.8;
+      for (let i = 0; i < 12; i++) points.push([lx + (rx - lx) * (i / 11), ty]);   // top L->R
+      for (let i = 1; i < 12; i++) points.push([rx, ty + (by - ty) * (i / 11)]);   // right T->B
+      for (let i = 1; i < 12; i++) points.push([rx - (rx - lx) * (i / 11), by]);   // bottom R->L
+      for (let i = 1; i < 12; i++) points.push([lx, by - (by - ty) * (i / 11)]);   // left B->T
+      return points;
+    }
+
+    _getPointOnEdge(edge, t) {
+      const lx = this.width * 0.25, rx = this.width * 0.55;
+      const ty = this.height * 0.2, by = this.height * 0.8;
+      if (edge === 'top') return [lx + (rx - lx) * t, ty];
+      if (edge === 'right') return [rx, ty + (by - ty) * t];
+      if (edge === 'bottom') return [rx - (rx - lx) * t, by];
+      if (edge === 'left') return [lx, by - (by - ty) * t];
+      return [lx, ty];
+    }
+
+    _createCheckpointsWithStartFinish() {
+      const checkpoints = [this.startLinePos];
+      const numIntermediate = 7;
+      const total = this.trackPoints.length;
+
+      let startIdx = 0, minDist = Infinity;
+      for (let i = 0; i < total; i++) {
+        const p = this.trackPoints[i];
+        const d = Math.hypot(p[0] - this.startLinePos[0], p[1] - this.startLinePos[1]);
+        if (d < minDist) { minDist = d; startIdx = i; }
+      }
+      for (let i = 1; i <= numIntermediate; i++) {
+        const offset = Math.floor(i * (total / (numIntermediate + 1)));
+        checkpoints.push(this.trackPoints[(startIdx + offset) % total]);
+      }
+      checkpoints.push(this.finishLinePos);
+      return checkpoints;
+    }
+
+    _createCheckpointColors() {
+      return ['#22ff22',
+        '#ff3b30', '#ff9500', '#ffd60a', '#22ff22', '#00ffff', '#3b82f6', '#a855f7',
+        '#ff3b30'];
+    }
+
+    _calculateTrackDirection() {
+      const dirs = [];
+      for (let i = 0; i < this.trackPoints.length; i++) {
+        const c = this.trackPoints[i];
+        const n = this.trackPoints[(i + 1) % this.trackPoints.length];
+        const dx = n[0] - c[0], dy = n[1] - c[1];
+        const len = Math.hypot(dx, dy);
+        dirs.push(len > 0 ? new Vector2(dx / len, dy / len) : new Vector2(0, 0));
+      }
+      return dirs;
+    }
+
+    _calculateFixedStartPositions() {
+      const positions = [];
+      const sp = new Vector2(this.startLinePos[0], this.startLinePos[1]);
+      let nextIdx = null;
+      for (let i = 0; i < this.trackPoints.length; i++) {
+        const p = this.trackPoints[i];
+        if (Math.hypot(p[0] - sp.x, p[1] - sp.y) < 20) { nextIdx = (i + 1) % this.trackPoints.length; break; }
+      }
+      if (nextIdx === null) return positions;
+      const np = new Vector2(this.trackPoints[nextIdx][0], this.trackPoints[nextIdx][1]);
+      const dx = np.x - sp.x, dy = np.y - sp.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 0) {
+        const dirX = dx / len, dirY = dy / len;
+        const perpX = -dirY, perpY = dirX;
+        const spacing = TRACK_WIDTH / 7;
+        for (let i = 0; i < 6; i++) {
+          const offset = (i + 1 - 3.5) * spacing;
+          positions.push(new Vector2(sp.x + dirX * 10 + perpX * offset, sp.y + dirY * 10 + perpY * offset));
+        }
+      }
+      return positions;
+    }
+
+    getStartPosition(horseIndex) {
+      if (!this.fixedStartPositions.length) return new Vector2(this.width * 0.4, this.height * 0.5);
+      return this.fixedStartPositions[horseIndex % this.fixedStartPositions.length].copy();
+    }
+
+    getSpreadStartPositions(numHorses) {
+      return Array.from({ length: numHorses }, (_, i) => this.getStartPosition(i));
+    }
+
+    getTotalCheckpoints() { return this.checkpointPositions.length; }
+
+    isPositionOnTrack(pos) {
+      const [gx, gy] = this.grid.worldToGrid(pos.x, pos.y);
+      return this.grid.getNode(gx, gy) === NodeState.RACE_TRACK;
+    }
+
+    getNearestTrackPosition(pos) {
+      let minDist = Infinity;
+      let nearest = new Vector2(pos.x, pos.y);
+      for (const p of this.trackPoints) {
+        const d = Math.hypot(p[0] - pos.x, p[1] - pos.y);
+        if (d < minDist) { minDist = d; nearest = new Vector2(p[0], p[1]); }
+      }
+      return nearest;
+    }
+
+    getForwardDirection(pos) {
+      let minDist = Infinity, closestIdx = 0;
+      for (let i = 0; i < this.trackPoints.length; i++) {
+        const p = this.trackPoints[i];
+        const d = Math.hypot(p[0] - pos.x, p[1] - pos.y);
+        if (d < minDist) { minDist = d; closestIdx = i; }
+      }
+      return this.trackDirection[closestIdx].copy();
+    }
+
+    _createStaticSurface() {
+      // Pre-render grass + track + checkpoints + labels once.
+      const off = document.createElement('canvas');
+      off.width = this.width;
+      off.height = this.height;
+      const ctx = off.getContext('2d');
+
+      ctx.fillStyle = COLORS.GREEN;
+      ctx.fillRect(0, 0, this.width, this.height);
+
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      const strokePath = (color, w) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(this.trackPoints[0][0], this.trackPoints[0][1]);
+        for (let i = 1; i < this.trackPoints.length; i++) ctx.lineTo(this.trackPoints[i][0], this.trackPoints[i][1]);
+        ctx.closePath();
+        ctx.stroke();
+      };
+      strokePath(COLORS.BROWN, TRACK_WIDTH);
+      strokePath(COLORS.LIGHT_BROWN, TRACK_WIDTH - 20);
+      strokePath('#f5f5f5', 3); // center guide
+
+      // direction arrows
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < this.trackPoints.length; i += 15) {
+        const p = this.trackPoints[i], d = this.trackDirection[i];
+        ctx.beginPath();
+        ctx.moveTo(p[0], p[1]);
+        ctx.lineTo(p[0] + d.x * 30, p[1] + d.y * 30);
+        ctx.stroke();
+      }
+
+      // checkpoints
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < this.checkpointPositions.length; i++) {
+        const cp = this.checkpointPositions[i];
+        const color = this.checkpointColors[i];
+        const isFirst = i === 0;
+        const isLast = i === this.checkpointPositions.length - 1;
+        const radius = isFirst || isLast ? 18 : 14;
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.lineWidth = isFirst || isLast ? 3 : 2;
+        ctx.strokeStyle = COLORS.WHITE;
+        ctx.stroke();
+        ctx.fillStyle = isFirst || isLast ? COLORS.BLACK : COLORS.WHITE;
+        ctx.font = `${isFirst || isLast ? 15 : 12}px monospace`;
+        ctx.fillText(isFirst ? 'S' : isLast ? 'F' : String(i), cp.x, cp.y);
+      }
+
+      // START / FINISH labels with outline
+      const label = (text, x, y) => {
+        ctx.font = 'bold 22px monospace';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = COLORS.BLACK;
+        ctx.strokeText(text, x, y);
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.fillText(text, x, y);
+      };
+      label('START', this.startLinePos[0] + 45, this.startLinePos[1] - 40);
+      label('FINISH', this.finishLinePos[0] - 60, this.finishLinePos[1] - 55);
+
+      // wooden fences
+      const fence = (offset) => {
+        const pts = [];
+        for (let i = 0; i < this.trackPoints.length; i++) {
+          const p = this.trackPoints[i];
+          const n = this.trackPoints[(i + 1) % this.trackPoints.length];
+          const dx = n[0] - p[0], dy = n[1] - p[1];
+          const len = Math.hypot(dx, dy);
+          if (len > 0) {
+            const px = (-dy / len) * offset, py = (dx / len) * offset;
+            pts.push([p[0] + px, p[1] + py]);
+          }
+        }
+        ctx.strokeStyle = COLORS.WOOD;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.closePath();
+        ctx.stroke();
+      };
+      fence(TRACK_WIDTH / 2 + 20);
+      fence(-(TRACK_WIDTH / 2 + 20));
+
+      return off;
+    }
+
+    draw(ctx) {
+      if (this.staticSurface) ctx.drawImage(this.staticSurface, 0, 0);
+    }
+  }
+
+  // ------------------------------------------------------------ 5. A* PATHFINDING
+  // Binary-heap priority queue over typed-array scratch buffers, bounded
+  // iterations + wall-clock budget per search, straight-line fallback, and
+  // result caching — no single search can ever block the main thread.
+  class PathRequest {
+    constructor(startPos, endPos) {
+      this.startPos = startPos;
+      this.endPos = endPos;
+      this.path = [];
+      this.success = false;
+    }
+  }
+
+  class MinHeap {
+    constructor() { this.ks = []; this.fs = []; this.size = 0; }
+    push(k, f) {
+      let i = this.size++;
+      this.ks[i] = k; this.fs[i] = f;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (this.fs[p] <= this.fs[i]) break;
+        this._swap(i, p); i = p;
+      }
+    }
+    pop() {
+      if (this.size === 0) return -1;
+      const top = this.ks[0];
+      this.size -= 1;
+      if (this.size > 0) {
+        this.ks[0] = this.ks[this.size];
+        this.fs[0] = this.fs[this.size];
+        let i = 0;
+        for (;;) {
+          const l = i * 2 + 1, r = l + 1;
+          let m = i;
+          if (l < this.size && this.fs[l] < this.fs[m]) m = l;
+          if (r < this.size && this.fs[r] < this.fs[m]) m = r;
+          if (m === i) break;
+          this._swap(i, m); i = m;
+        }
+      }
+      return top;
+    }
+    _swap(a, b) {
+      const k = this.ks[a]; this.ks[a] = this.ks[b]; this.ks[b] = k;
+      const f = this.fs[a]; this.fs[a] = this.fs[b]; this.fs[b] = f;
+    }
+  }
+
+  const DIR_X = [1, -1, 0, 0, 1, 1, -1, -1];
+  const DIR_Y = [0, 0, 1, -1, 1, -1, 1, -1];
+  const STEP_COST = [1, 1, 1, 1, Math.SQRT2, Math.SQRT2, Math.SQRT2, Math.SQRT2];
+
+  class Pathfinding {
+    constructor(grid, opts = {}) {
+      this.grid = grid;
+      this.cache = new Map();
+      this.maxIterations = opts.maxIterations ?? 6000;
+      this.timeBudgetMs = opts.timeBudgetMs ?? 8;
+
+      const cols = grid.width, rows = grid.height;
+      this.W = cols;
+      this.total = cols * rows;
+      this.gScore = new Float64Array(this.total);
+      this.cameFrom = new Int32Array(this.total);
+      this.stamp = new Int32Array(this.total); // generation marks: no re-fill cost
+      this.closed = new Uint8Array(this.total);
+      this.gen = 0;
+    }
+
+    findPath(startWorld, endWorld, useCache = true) {
+      const cacheKey = `${startWorld[0].toFixed(1)},${startWorld[1].toFixed(1)}->${endWorld[0].toFixed(1)},${endWorld[1].toFixed(1)}`;
+      if (useCache && this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+
+      const request = new PathRequest(startWorld, endWorld);
+      const g = this.grid;
+      const sx = Math.floor(startWorld[0] / g.nodeSize);
+      const sy = Math.floor(startWorld[1] / g.nodeSize);
+      const ex = Math.floor(endWorld[0] / g.nodeSize);
+      const ey = Math.floor(endWorld[1] / g.nodeSize);
+
+      const TRACK = NodeState.RACE_TRACK;
+      const at = (x, y) => (x >= 0 && x < this.W && y >= 0 && y < g.height) ? g.state[x][y] : 0;
+
+      if (at(sx, sy) !== TRACK || at(ex, ey) !== TRACK) {
+        return request; // not on track -> no path (do NOT cache failures)
+      }
+
+      // Trivially close? Straight line is good enough and costs nothing.
+      if (Math.abs(sx - ex) <= 2 && Math.abs(sy - ey) <= 2) {
+        request.path = [g.gridToWorld(sx, sy), g.gridToWorld(ex, ey)];
+        request.success = true;
+        this.cache.set(cacheKey, request);
+        return request;
+      }
+
+      const deadline = performance.now() + this.timeBudgetMs;
+      const gen = ++this.gen;
+      const W = this.W;
+      const startI = sx * W + sy, endI = ex * W + ey;
+
+      const heap = new MinHeap();
+      const hOf = (x, y) => Math.hypot(x - ex, y - ey);
+
+      this.gScore[startI] = 0;
+      this.stamp[startI] = gen;
+      this.cameFrom[startI] = -1;
+      this.closed[startI] = 0;
+      heap.push(startI, hOf(sx, sy));
+
+      let found = false;
+      let iter = 0;
+      while (heap.size > 0 && iter++ < this.maxIterations) {
+        if ((iter & 255) === 0 && performance.now() > deadline) break; // time's up
+        const cur = heap.pop();
+        if (this.stamp[cur] !== gen || this.closed[cur]) continue;
+        if (cur === endI) { found = true; break; }
+        this.closed[cur] = 1;
+
+        const cx = Math.floor(cur / W), cy = cur % W;
+        const cg = this.gScore[cur];
+        for (let d = 0; d < 8; d++) {
+          const dx = DIR_X[d], dy = DIR_Y[d];
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || nx >= this.W || ny < 0 || ny >= g.height) continue;
+          if (at(nx, ny) !== TRACK) continue;
+          if (dx !== 0 && dy !== 0) { // no corner cutting
+            if (at(cx + dx, cy) !== TRACK || at(cx, cy + dy) !== TRACK) continue;
+          }
+          const ni = nx * W + ny;
+          if (this.closed[ni]) continue;
+          const fresh = this.stamp[ni] !== gen;
+          if (fresh) { this.stamp[ni] = gen; this.closed[ni] = 0; }
+          const tentative = cg + STEP_COST[d];
+          if (fresh || tentative < this.gScore[ni]) {
+            this.gScore[ni] = tentative;
+            this.cameFrom[ni] = cur;
+            heap.push(ni, tentative + hOf(nx, ny));
+          }
+        }
+      }
+
+      if (found) {
+        const cells = [];
+        for (let k = endI; k !== -1; k = this.cameFrom[k]) {
+          cells.push([Math.floor(k / W), k % W]);
+        }
+        cells.reverse();
+        request.path = cells.map(([x, y]) => g.gridToWorld(x, y));
+        request.success = true;
+        this.cache.set(cacheKey, request);
+        return request;
+      }
+
+      // Fallback within the time budget: straight-line corridor toward the
+      // goal (both endpoints verified walkable above). Cheap, sane steering.
+      request.path = this._lineFallback(sx, sy, ex, ey);
+      request.success = request.path.length >= 2;
+      // Only cache the real A* result; retries may succeed later.
+      return request;
+    }
+
+    _lineFallback(sx, sy, ex, ey) {
+      const g = this.grid;
+      const pts = [];
+      const dx = ex - sx, dy = ey - sy;
+      const steps = Math.max(Math.abs(dx), Math.abs(dy));
+      for (let i = 0; i <= steps; i += 2) {
+        const x = Math.round(sx + (dx * i) / steps);
+        const y = Math.round(sy + (dy * i) / steps);
+        pts.push(g.gridToWorld(x, y));
+      }
+      pts.push(g.gridToWorld(ex, ey));
+      return pts;
+    }
+
+    clearCache() { this.cache.clear(); }
+  }
+
+  // ------------------------------------------------------------ 6. HORSE MEMORY
+  // "Each horse recalls their past runs and improves with new attempts."
+  // Per-horse record: races, wins, best/avg/last time, resets, history,
+  // per-checkpoint segment times, learned racing lines, skill (0..1).
+  function freshMemory() {
+    return { horses: {} };
+  }
+
+  function emptyHorseRecord(name) {
+    return {
+      name,
+      races: 0, wins: 0,
+      bestTime: null, lastTime: null, avgTime: null,
+      totalResets: 0,
+      history: [],
+      checkpointTimes: new Array(TOTAL_CHECKPOINTS).fill(null),
+      skill: 0,
+    };
+  }
+
+  function loadMemory() {
+    try {
+      const raw = localStorage.getItem(MEMORY_KEY);
+      if (!raw) return freshMemory();
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object' || !data.horses) return freshMemory();
+      return data;
+    } catch (e) {
+      console.warn('Could not load horse memory:', e);
+      return freshMemory();
+    }
+  }
+
+  // Debounced, compacted writes: at most one small localStorage hit per
+  // second instead of a full synchronous JSON dump on every horse finish.
+  let _saveTimer = null;
+  let _pendingMemory = null;
+
+  function serializeMemory(memory) {
+    return JSON.stringify(memory, (key, value) => {
+      if (key === 'lines' && value && typeof value === 'object') {
+        const out = {};
+        for (const [seg, pts] of Object.entries(value)) {
+          if (!Array.isArray(pts)) continue;
+          out[seg] = pts.slice(0, 40).map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]);
+        }
+        return out;
+      }
+      return value;
+    });
+  }
+
+  function writeMemoryNow() {
+    if (!_pendingMemory) return;
+    try {
+      localStorage.setItem(MEMORY_KEY, serializeMemory(_pendingMemory));
+    } catch (e) {
+      console.warn('Could not save horse memory:', e);
+    }
+    _pendingMemory = null;
+  }
+
+  function flushMemory() {
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+    writeMemoryNow();
+  }
+
+  function saveMemory(memory) {
+    _pendingMemory = memory;
+    if (_saveTimer) return;              // already scheduled — coalesce writes
+    _saveTimer = setTimeout(() => {
+      _saveTimer = null;
+      writeMemoryNow();
+    }, 1000);                            // at most one blocking write per second
+  }
+
+  function wipeMemory(memory, names) {
+    for (const n of names) delete memory.horses[n];
+    saveMemory(memory);
+  }
+
+  function getRecord(memory, name) {
+    if (!memory.horses[name]) memory.horses[name] = emptyHorseRecord(name);
+    return memory.horses[name];
+  }
+
+  // Skill grows with completed races (diminishing returns), shrinks slightly
+  // when a run needed many stuck-resets (bad route recall).
+  function computeSkill(record) {
+    let s = Math.min(1, record.races * 0.12);
+    const badRuns = record.history.filter((h) => h.resets > 0).length;
+    s -= Math.min(0.2, badRuns * 0.02);
+    return Math.max(0, Math.min(1, s));
+  }
+
+  function recordFinish(record, finishTime, resets, segmentTimes) {
+    record.races += 1;
+    record.lastTime = finishTime;
+    record.totalResets += resets;
+    record.history.push({ time: finishTime, resets });
+    if (record.history.length > 20) record.history.shift();
+
+    record.bestTime = record.bestTime === null ? finishTime : Math.min(record.bestTime, finishTime);
+
+    const times = record.history.map((h) => h.time);
+    record.avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+
+    // Exponential moving average of per-checkpoint segment times -> used to
+    // predict finishing order & set odds.
+    for (let i = 0; i < segmentTimes.length && i < TOTAL_CHECKPOINTS; i++) {
+      const t = segmentTimes[i];
+      if (t == null) continue;
+      const prev = record.checkpointTimes[i];
+      record.checkpointTimes[i] = prev == null ? t : prev * 0.6 + t * 0.4;
+    }
+
+    record.skill = computeSkill(record);
+  }
+
+  function predictedTime(record) {
+    const known = record.checkpointTimes.filter((t) => t != null);
+    if (known.length === 0) return null;
+    const sumKnown = known.reduce((a, b) => a + b, 0);
+    const avgKnown = sumKnown / known.length;
+    return sumKnown + avgKnown * (TOTAL_CHECKPOINTS - known.length);
+  }
+
+  function winProbability(records) {
+    // inverse of predicted time (skill-shaved), normalized
+    const preds = records.map((r) => {
+      const p = predictedTime(r);
+      if (p != null) return Math.max(4, p * (1 - 0.12 * r.skill));
+      return 30 - 8 * r.skill; // no memory yet: skill still gives an edge
+    });
+    const inv = preds.map((p) => 1 / p);
+    const tot = inv.reduce((a, b) => a + b, 0) || 1;
+    return inv.map((v) => v / tot);
+  }
+
+  function oddsFromProb(p) {
+    return Math.max(1.1, Math.round((0.92 / p) * 10) / 10);
+  }
+
+  // ---------------------------------------------------------- 7. BETTING SYSTEM
+  // Fake money. Bankroll lives in sessionStorage -> wiped when the tab closes.
+  // Pari-mutuel pool with 8% house takeout; unbet winners pay $2 to show.
+  class BettingSystem {
+    constructor(overrideBalance = null) {
+      this.balance = overrideBalance != null ? overrideBalance : this._loadBalance();
+      this.bets = {};          // horseName -> amount wagered this race
+      this.lastResults = null; // payout summary of previous race
+      this.history = [];       // recent race results for the UI log
+    }
+
+    _loadBalance() {
+      try {
+        const v = sessionStorage.getItem(BALANCE_KEY);
+        if (v === null) return STARTING_BALANCE;
+        const n = parseInt(v, 10);
+        return Number.isFinite(n) && n >= 0 ? n : STARTING_BALANCE;
+      } catch (e) {
+        return STARTING_BALANCE;
+      }
+    }
+
+    _saveBalance() {
+      try { sessionStorage.setItem(BALANCE_KEY, String(this.balance)); } catch (e) { /* ignore */ }
+    }
+
+    get chipValues() { return BET_CHIP_VALUES; }
+
+    get totalWagered() {
+      return Object.values(this.bets).reduce((a, b) => a + b, 0);
+    }
+
+    canAfford(amount) {
+      return amount > 0 && amount <= this.balance - this.totalWagered;
+    }
+
+    placeBet(horseName, amount) {
+      if (!this.canAfford(amount)) return false;
+      this.bets[horseName] = (this.bets[horseName] || 0) + amount;
+      this._saveBalance();
+      return true;
+    }
+
+    removeBet(horseName) {
+      if (this.bets[horseName]) {
+        delete this.bets[horseName];
+        this._saveBalance();
+      }
+    }
+
+    clearBets() {
+      this.bets = {};
+      this._saveBalance();
+    }
+
+    settle(winnerName) {
+      const pool = this.totalWagered;
+      let payout = 0;
+      const details = [];
+
+      for (const [name, amt] of Object.entries(this.bets)) {
+        if (name === winnerName) {
+          const winPool = this.bets[winnerName] || 0;
+          const netPool = pool * 0.92;
+          const share = winPool > 0 ? (amt / winPool) * netPool : 2;
+          payout += share;
+          details.push({ name, bet: amt, won: share });
+        } else {
+          details.push({ name, bet: amt, won: 0 });
+        }
+      }
+
+      payout = Math.round(payout);
+      const profit = payout - pool;
+      this.balance += payout; // staked money was already deducted from spendable balance
+      this._saveBalance();
+
+      this.lastResults = { winner: winnerName, staked: pool, payout, profit, details };
+      this.history.unshift({
+        winner: winnerName,
+        staked: pool,
+        profit,
+        balance: this.balance,
+        time: new Date().toLocaleTimeString(),
+      });
+      if (this.history.length > 8) this.history.pop();
+
+      this.bets = {};
+      return this.lastResults;
+    }
+
+    resetBankroll() {
+      this.balance = STARTING_BALANCE;
+      this.bets = {};
+      this.lastResults = null;
+      this.history = [];
+      this._saveBalance();
+    }
+  }
+
+  // -------------------------------------------------------------- 8. HORSE AGENT
+  // Each horse is an independent AI agent: A* path to the next checkpoint +
+  // simultaneous steering forces (separation, path following, track
+  // attraction, barrier avoidance, checkpoint pull, clockwise enforcement).
+  // It remembers barriers it hits, remembers its best racing line per
+  // segment, gets faster with experience, and auto-resets when stuck.
+  class Horse {
+    constructor(x, y, color) {
+      this.position = new Vector2(x, y);
+      this.velocity = new Vector2(Math.random() * 4 - 2, Math.random() * 4 - 2);
+      this.acceleration = new Vector2(0, 0);
+
+      this.name = '';
+      this.index = 0;
+
+      // base speed tuned so a rookie lap takes ~16s at 60 FPS; each horse
+      // gets a fixed (deterministic) talent offset so races are competitive
+      // but not identical — memory/learning layers on top of that.
+      this.talent = 0; // set via setName() so it is deterministic per horse
+      this.baseMaxSpeed = 13.5 * (1 + this.talent);
+      this.maxSpeed = this.baseMaxSpeed;
+      this.maxForce = 0.3;
+
+      this.separationWeight = 1.0;
+      this.pathWeight = 3.0;
+      this.trackAttractionWeight = 3.0;
+      this.barrierAvoidanceWeight = 5.0;
+      this.checkpointWeight = 5.0;
+      this.clockwiseWeight = 4.0;
+      this.lineWeight = 0; // grows with experience
+
+      // pathfinding
+      this.target = null;
+      this.currentPath = [];
+      this.pathUpdateTimer = 0;
+      this.pathUpdateInterval = 30;
+      this.track = null;
+
+      this.color = color;
+      this.size = 10;
+
+      // race state
+      this.distanceTraveled = 0;
+      this.currentCheckpointIndex = 0;
+      this.totalCheckpoints = TOTAL_CHECKPOINTS;
+      this.checkpointReachedTime = 0;
+      this.hasFinished = false;
+      this.finishTime = null;
+      this.segmentTimes = new Array(TOTAL_CHECKPOINTS).fill(null);
+      this.raceStartTime = null;
+      this.lastCheckpointStamp = null;
+
+      // barrier memory
+      this.barrierMemory = new Set();
+      this.maxMemorySize = 50;
+      this.barrierDetectionRadius = 80;
+      this.consecutiveBarrierHits = 0;
+      this.maxConsecutiveHits = 8;
+      this.lastBarrierHit = 0;
+
+      // stuck detection
+      this.stuckTimer = 0;
+      this.stuckThreshold = 120;
+      this.lastPosition = new Vector2(x, y);
+      this.resetCooldown = 0;
+      this.resetsThisRace = 0;
+
+      // wrong direction tracking
+      this.wrongDirectionPenalty = 0;
+
+      // trail
+      this.pathHistory = [];
+      this.pathHistoryMax = 30;
+
+      // learned preferred line (per segment), restored from memory
+      this.preferredLine = {};   // segIndex -> [[x,y],...]
+      this.skill = 0;
+      this.attempts = 0;
+    }
+
+    setName(name, index) {
+      this.name = name;
+      this.index = index;
+      // deterministic talent in [-0.20, +0.20] derived from the horse's identity
+      const hsh = hashString(name + '|' + this.color);
+      this.talent = ((hsh % 41) - 20) / 100;
+      this.baseMaxSpeed = 13.5 * (1 + this.talent);
+      this.applySkill(this.skill);
+    }
+
+    applySkill(skill) {
+      // Horse improves with experience: up to +25% top speed and stronger
+      // recall of its preferred racing line.
+      this.skill = skill;
+      this.maxSpeed = this.baseMaxSpeed * (1 + 0.25 * skill);
+      this.lineWeight = 2.5 * skill;
+    }
+
+    now() { return this.track ? this.track.simTime : performance.now() / 1000; }
+
+    requestNewPath(pathfinder) {
+      if (this.target === null || this.hasFinished) return;
+      // Safety net: never let a path search run unbounded. If the horse is
+      // off the track grid, skip searching entirely and steer straight at
+      // the checkpoint (the attractToTrack/Checkpoint forces recover it).
+      const nearTrack = this.track ? this.track.isPositionOnTrack(this.position) : true;
+      if (!nearTrack) { this.currentPath = []; return; }
+      const start = [this.position.x, this.position.y];
+      const end = [this.target.x, this.target.y];
+      const result = pathfinder.findPath(start, end);
+      if (result.success) {
+        this.currentPath = result.path;
+        if (this.currentPath.length > 1) {
+          const first = this.currentPath[0];
+          const d = Math.hypot(first[0] - this.position.x, first[1] - this.position.y);
+          if (d < 20) this.currentPath.shift();
+        }
+      }
+    }
+
+    updateCheckpoint() {
+      if (this.hasFinished || !this.track) return;
+      if (this.currentCheckpointIndex >= this.totalCheckpoints) return;
+
+      const cp = this.track.checkpointPositions[this.currentCheckpointIndex];
+      const dist = distance(this.position, cp);
+
+      if (dist < this.track.checkpointRadius && this.checkpointReachedTime === 0) {
+        const t = this.now();
+        this.segmentTimes[this.currentCheckpointIndex] =
+          this.lastCheckpointStamp == null ? t - this.raceStartTime : t - this.lastCheckpointStamp;
+        this.lastCheckpointStamp = t;
+
+        // did this segment beat my remembered line? If so, memorize this route.
+        const segKey = String(this.currentCheckpointIndex);
+        if (this.currentPath.length > 1) {
+          const prev = this.preferredLine[segKey];
+          const lenOf = (line) => {
+            let L = 0;
+            for (let i = 1; i < line.length; i++)
+              L += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
+            return L;
+          };
+          if (!prev || lenOf(this.currentPath) < lenOf(prev) * 0.98) {
+            this.preferredLine[segKey] = this.currentPath.slice(0, 60);
+          }
+        }
+
+        if (this.currentCheckpointIndex === this.totalCheckpoints - 1) {
+          this.markFinished();
+          return;
+        }
+
+        this.currentCheckpointIndex += 1;
+        this.checkpointReachedTime = 20;
+        this.target = this.track.checkpointPositions[this.currentCheckpointIndex];
+        this.barrierMemory.clear();
+        this.consecutiveBarrierHits = 0;
+        this.stuckTimer = 0;
+        this.wrongDirectionPenalty = 0;
+        this.requestNewPath(this.track.pathfinder);
+      }
+
+      if (this.checkpointReachedTime > 0) this.checkpointReachedTime -= 1;
+    }
+
+    checkIfStuck() {
+      if (this.hasFinished) return false;
+      if (this.resetCooldown > 0) { this.resetCooldown -= 1; return false; }
+
+      const moved = distance(this.position, this.lastPosition);
+      this.lastPosition = new Vector2(this.position.x, this.position.y);
+
+      // "stuck" = barely moving for a long time (real stall), not just wandering
+      const slow = this.velocity.mag() < 0.6 * this.maxSpeed;
+      if (moved < 0.7 && slow) this.stuckTimer += 2;
+      else this.stuckTimer = Math.max(0, this.stuckTimer - 2);
+
+      if (this.stuckTimer > this.stuckThreshold) return true;
+      if (this.consecutiveBarrierHits > this.maxConsecutiveHits) return true;
+      if (this.wrongDirectionPenalty > 40 && (this._wdFrames || 0) > 25) return true;
+      return false;
+    }
+
+    resetToStart() {
+      if (this.hasFinished || !this.track) return;
+      this.resetsThisRace += 1;
+
+      const startPos = this.track.getStartPosition(this.index);
+      this.position = startPos.copy();
+      const forward = this.track.getForwardDirection(this.position);
+      this.velocity = new Vector2(forward.x * 2, forward.y * 2);
+
+      this.currentCheckpointIndex = 0;
+      this.checkpointReachedTime = 0;
+      this.barrierMemory.clear();
+      this.consecutiveBarrierHits = 0;
+      this.stuckTimer = 0;
+      this.resetCooldown = 60;
+      this.wrongDirectionPenalty = 0;
+      this.pathHistory = [];
+      this.lastPosition = this.position.copy();
+
+      // re-route fresh around any barriers I now remember
+      this.target = this.track.checkpointPositions[0];
+      this.requestNewPath(this.track.pathfinder);
+    }
+
+    markFinished() {
+      this.hasFinished = true;
+      this.finishTime = this.now() - this.raceStartTime;
+      this.velocity = new Vector2(0, 0);
+      this.target = null;
+      this.currentPath = [];
+    }
+
+    seek(target) {
+      const desired = target.copy().sub(this.position);
+      if (desired.mag() === 0) return new Vector2(0, 0);
+      desired.normalize().mult(this.maxSpeed);
+      const steer = desired.sub(this.velocity);
+      steer.limit(this.maxForce);
+      return steer;
+    }
+
+    separation(horses) {
+      const steer = new Vector2(0, 0);
+      let count = 0;
+      for (const other of horses) {
+        if (other === this) continue;
+        const d = distance(this.position, other.position);
+        if (d > 0 && d < 15) {
+          const diff = this.position.copy().sub(other.position).normalize().div(Math.max(d, 1));
+          steer.add(diff);
+          count += 1;
+        }
+      }
+      if (count > 0) {
+        steer.div(count);
+        if (steer.mag() > 0) {
+          steer.normalize().mult(this.maxSpeed).sub(this.velocity);
+          steer.limit(this.maxForce);
+        }
+      }
+      return steer;
+    }
+
+    attractToCheckpoint() {
+      if (this.hasFinished || !this.track) return new Vector2(0, 0);
+      if (this.currentCheckpointIndex >= this.totalCheckpoints) return new Vector2(0, 0);
+      return this.seek(this.track.checkpointPositions[this.currentCheckpointIndex]);
+    }
+
+    attractToTrack() {
+      if (this.hasFinished || !this.track) return new Vector2(0, 0);
+      const nearest = this.track.getNearestTrackPosition(this.position);
+      if (distance(this.position, nearest) > 20) return this.seek(nearest);
+      return new Vector2(0, 0);
+    }
+
+    avoidBarriers() {
+      if (this.hasFinished || !this.track) return new Vector2(0, 0);
+      const grid = this.track.grid;
+      const steer = new Vector2(0, 0);
+      let count = 0;
+      let hit = false;
+
+      const center = grid.worldToGrid(this.position.x, this.position.y);
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dy = -3; dy <= 3; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          const gx = center[0] + dx, gy = center[1] + dy;
+          const node = grid.getNode(gx, gy);
+          if (node !== null && node !== NodeState.RACE_TRACK) {
+            const w = grid.gridToWorld(gx, gy);
+            const barrier = new Vector2(w[0], w[1]);
+            if (this.barrierMemory.size < this.maxMemorySize) this.barrierMemory.add(`${gx},${gy}`);
+
+            const dist = distance(this.position, barrier);
+            if (dist < this.barrierDetectionRadius) {
+              const away = this.position.copy().sub(barrier).normalize();
+              let weight = 5.0; // remembered barrier gets stronger avoidance
+              if (dist < 20) { weight *= 2.0; hit = true; }
+              away.mult(weight / Math.max(dist, 1));
+              steer.add(away);
+              count += 1;
+            }
+          }
+        }
+      }
+
+      if (hit) { this.consecutiveBarrierHits += 1; this.lastBarrierHit = 10; }
+      else this.consecutiveBarrierHits = Math.max(0, this.consecutiveBarrierHits - 1);
+
+      if (count > 0) {
+        steer.div(count);
+        if (steer.mag() > 0) {
+          steer.normalize().mult(this.maxSpeed * 1.5).sub(this.velocity);
+          steer.limit(this.maxForce * 2);
+        }
+      }
+      return steer;
+    }
+
+    enforceClockwise() {
+      if (this.hasFinished || !this.track) return new Vector2(0, 0);
+      const forward = this.track.getForwardDirection(this.position);
+      if (this.velocity.mag() > 0) {
+        const vn = this.velocity.copy().normalize();
+        const dot = vn.x * forward.x + vn.y * forward.y;
+        if (dot < 0) {
+          this.wrongDirectionPenalty += 1;
+          this._wdFrames = (this._wdFrames || 0) + 1;
+          const turn = new Vector2(forward.x * this.maxSpeed, forward.y * this.maxSpeed).sub(this.velocity);
+          turn.limit(this.maxForce * 2);
+          return turn;
+        } else if (dot < 0.5) {
+          this._wdFrames = 0;
+          const nudge = new Vector2(forward.x * this.maxSpeed, forward.y * this.maxSpeed).sub(this.velocity);
+          nudge.limit(this.maxForce * 0.5);
+          return nudge;
+        }
+      }
+      this._wdFrames = 0;
+      this.wrongDirectionPenalty = Math.max(0, this.wrongDirectionPenalty - 1);
+      return new Vector2(0, 0);
+    }
+
+    lineBonus() {
+      // Up to +8% speed when riding close to its remembered best line.
+      const line = this.preferredLine[String(this.currentCheckpointIndex)];
+      if (!line || line.length < 2 || this.skill <= 0) return 1;
+      let minD = Infinity;
+      for (const p of line) {
+        const d = Math.hypot(p[0] - this.position.x, p[1] - this.position.y);
+        if (d < minD) minD = d;
+      }
+      const closeness = Math.max(0, 1 - minD / 120); // 1 on the line, 0 far away
+      return 1 + 0.08 * closeness * this.skill;
+    }
+
+    followPreferredLine() {
+      const line = this.preferredLine[String(this.currentCheckpointIndex)];
+      if (!line || line.length < 2) return new Vector2(0, 0);
+      let next = null, minD = Infinity;
+      for (const p of line) {
+        const d = Math.hypot(p[0] - this.position.x, p[1] - this.position.y);
+        if (d < 30) continue;
+        if (d < minD) { minD = d; next = p; }
+      }
+      if (!next) return new Vector2(0, 0);
+      return this.seek(new Vector2(next[0], next[1]));
+    }
+
+    followPath() {
+      if (!this.currentPath.length) return new Vector2(0, 0);
+      let nextPoint = null, minDist = Infinity;
+      for (const p of this.currentPath) {
+        const pv = new Vector2(p[0], p[1]);
+        const d = distance(this.position, pv);
+        if (d < 40) continue;
+        if (d < minDist) { minDist = d; nextPoint = pv; }
+      }
+      if (nextPoint === null && this.target) return this.seek(this.target);
+      return nextPoint ? this.seek(nextPoint) : new Vector2(0, 0);
+    }
+
+    applyForce(f) { this.acceleration.add(f); }
+
+    flock(horses) {
+      this._field = horses;
+      if (this.hasFinished) return;
+
+      if (this.checkIfStuck()) { this.resetToStart(); return; }
+      this.updateCheckpoint();
+      if (this.hasFinished) return;
+
+      this.applyForce(this.separation(horses).mult(this.separationWeight));
+
+      this.pathUpdateTimer += 1;
+      if (this.pathUpdateTimer >= this.pathUpdateInterval) {
+        if (this.target) this.requestNewPath(this.track.pathfinder);
+        this.pathUpdateTimer = 0;
+      }
+
+      this.applyForce(this.followPath().mult(this.pathWeight));
+
+      if (this.lineWeight > 0) {
+        this.applyForce(this.followPreferredLine().mult(this.lineWeight));
+      }
+
+      this.applyForce(this.attractToTrack().mult(this.trackAttractionWeight));
+      this.applyForce(this.avoidBarriers().mult(this.barrierAvoidanceWeight));
+      this.applyForce(this.attractToCheckpoint().mult(this.checkpointWeight));
+      this.applyForce(this.enforceClockwise().mult(this.clockwiseWeight));
+
+      // small random jitter keeps races competitive and breaks symmetry
+      if (this.raceStartTime != null) {
+        const jitter = new Vector2(Math.random() - 0.5, Math.random() - 0.5).mult(0.08);
+        this.applyForce(jitter);
+      }
+    }
+
+    update(bounds) {
+      if (this.lastBarrierHit > 0) this.lastBarrierHit -= 1;
+
+      // racing chaos: occasional stumbles (more likely in a crowd) and surges.
+      let chaos = 1;
+      if (!this.hasFinished && this.raceStartTime != null) {
+        let neighbors = 0;
+        for (const o of this._field || []) {
+          if (o !== this && !o.hasFinished && distance(this.position, o.position) < 60) neighbors++;
+        }
+        if (Math.random() < 0.004 + neighbors * 0.002) this._stumble = 25 + Math.floor(Math.random() * 20);
+        if (this._stumble > 0) { this._stumble -= 1; chaos = 0.55; }
+        else if (Math.random() < 0.004) chaos = 1.18; // lucky surge
+      }
+      this.velocity.add(this.acceleration);
+      this.velocity.limit(this.maxSpeed * this.lineBonus() * chaos);
+      if (this.velocity.mag() > 0) this.distanceTraveled += this.velocity.mag();
+      this.position.add(this.velocity);
+      this.acceleration = new Vector2(0, 0);
+
+      this.pathHistory.push([this.position.x, this.position.y]);
+      if (this.pathHistory.length > this.pathHistoryMax) this.pathHistory.shift();
+
+      const [w, h] = bounds;
+      if (this.position.x < 0) this.position.x = w;
+      else if (this.position.x > w) this.position.x = 0;
+      if (this.position.y < 0) this.position.y = h;
+      else if (this.position.y > h) this.position.y = 0;
+
+      if (this.track && !this.hasFinished && !this.track.isPositionOnTrack(this.position)) {
+        const nearest = this.track.getNearestTrackPosition(this.position);
+        if (distance(this.position, nearest) > 50) {
+          const dir = nearest.copy().sub(this.position);
+          if (dir.mag() > 0) { dir.normalize(); this.velocity = dir.mult(this.maxSpeed); }
+        }
+      }
+    }
+
+    draw(ctx) {
+      // trail
+      if (this.pathHistory.length > 1) {
+        ctx.strokeStyle = this.color;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i + 1 < this.pathHistory.length; i += 2) {
+          ctx.moveTo(this.pathHistory[i][0], this.pathHistory[i][1]);
+          ctx.lineTo(this.pathHistory[i + 1][0], this.pathHistory[i + 1][1]);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      const x = this.position.x, y = this.position.y;
+
+      if (this.hasFinished) {
+        ctx.strokeStyle = '#ffd60a';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, y, this.size + 5, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.arc(x, y, this.size, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('F', x, y);
+        return;
+      }
+
+      if (this.velocity.mag() < 0.1) return;
+      const angle = Math.atan2(this.velocity.y, this.velocity.x);
+      const s = this.size;
+      const tip = [x + s * 1.5 * Math.cos(angle), y + s * 1.5 * Math.sin(angle)];
+      const left = [x - s * Math.cos(angle) + s * Math.sin(angle), y - s * Math.sin(angle) - s * Math.cos(angle)];
+      const right = [x - s * Math.cos(angle) - s * Math.sin(angle), y - s * Math.sin(angle) + s * Math.cos(angle)];
+
+      ctx.fillStyle = this.color;
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(tip[0], tip[1]);
+      ctx.lineTo(left[0], left[1]);
+      ctx.lineTo(right[0], right[1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // name tag
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(this.name, x, y - 12);
+    }
+  }
+
+  // ------------------------------------------------------------- GAME CONTROLLER
+  // State machine: betting -> racing -> results -> betting ...
+  class DerbyGame {
+    constructor(canvas) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      this.track = new RaceTrack(WIDTH, HEIGHT);
+
+      this.memory = loadMemory();
+      this.betting = new BettingSystem();
+
+      this.horses = [];
+      const starts = this.track.getSpreadStartPositions(NUM_HORSES);
+      for (let i = 0; i < NUM_HORSES; i++) {
+        const h = new Horse(starts[i].x, starts[i].y, HORSE_COLORS[i % HORSE_COLORS.length]);
+        h.track = this.track;
+        h.setName(HORSE_NAMES[i], i);
+        this._restoreHorseMemory(h);
+        this.horses.push(h);
+      }
+
+      this.state = 'betting';
+      this.selectedChip = 25;
+      this.raceFinishedCount = 0;
+      this.order = [];        // finish order (horse names)
+      this.settlement = null; // last payout info
+      this.odds = {};         // name -> decimal odds
+      this.resultsTimer = 0;
+
+      this.lastFrame = performance.now();
+      this.fps = 60;
+      this.raf = null;
+
+      // Heavy setup (static track render, path caches) deferred until after
+      // the first painted frame so the page becomes interactive immediately.
+      this._ready = false;
+
+      this.recomputeOdds();
+      this.resetHorsesToStart();
+
+      this._bindUI();
+      this.updateUI();
+    }
+
+    _finishDeferredSetup() {
+      if (this._ready) return;
+      this._ready = true;
+      this.track.prepare();
+      for (const h of this.horses) h.requestNewPath(this.track.pathfinder);
+    }
+
+    // ------------------------------------------------------------- horses ----
+    _restoreHorseMemory(h) {
+      const rec = getRecord(this.memory, h.name);
+      h.skill = rec.skill;
+      h.attempts = rec.races;
+      h.preferredLine = {};
+      if (rec.lines) {
+        for (const [k, v] of Object.entries(rec.lines)) h.preferredLine[k] = v;
+      }
+      h.applySkill(rec.skill);
+    }
+
+    _saveHorseLines(h) {
+      const rec = getRecord(this.memory, h.name);
+      rec.lines = h.preferredLine;
+    }
+
+    resetHorsesToStart() {
+      const starts = this.track.getSpreadStartPositions(NUM_HORSES);
+      for (let i = 0; i < this.horses.length; i++) {
+        const h = this.horses[i];
+        const sp = starts[i];
+        h.position = sp.copy();
+        h.velocity = this.track.getForwardDirection(sp).mult(2.0);
+        h.acceleration = new Vector2(0, 0);
+        h.hasFinished = false;
+        h.finishTime = null;
+        h.currentCheckpointIndex = 0;
+        h.checkpointReachedTime = 0;
+        h.segmentTimes.fill(null);
+        h.lastCheckpointStamp = null;
+        h.barrierMemory.clear();
+        h.consecutiveBarrierHits = 0;
+        h.stuckTimer = 0;
+        h.resetCooldown = 0;
+        h.resetsThisRace = 0;
+        h.wrongDirectionPenalty = 0;
+        h.pathHistory = [];
+        h.lastPosition = sp.copy();
+        h.target = this.track.checkpointPositions[0];
+        // Paths are requested lazily on race start (see startRace()), which
+        // keeps page load instantaneous.
+      }
+      this.order = [];
+      this.settlement = null;
+    }
+
+    // One simulation step. Guarded so a heavy frame can never lock up the tab:
+    // if a single update batch would exceed the frame budget we skip the rest
+    // (the browser stays responsive; the sim simply continues next frame).
+    tick() {
+      const t0 = performance.now();
+      for (const h of this.horses) {
+        if (h.hasFinished) continue;
+        h.flock(this.horses);
+        h.update([WIDTH, HEIGHT]);
+        if (h.hasFinished) {
+          this.raceFinishedCount += 1;
+          this.order.push(h.name);
+          const rec = getRecord(this.memory, h.name);
+          recordFinish(rec, h.finishTime, h.resetsThisRace, h.segmentTimes);
+          if (this.order.length === 1) rec.wins += 1;
+          this._saveHorseLines(h);
+          saveMemory(this.memory);
+        }
+        if (performance.now() - t0 > 12) break; // frame budget guard
+      }
+      if (this.raceFinishedCount >= NUM_HORSES) {
+        this.finishRace();
+      }
+    }
+
+    // -------------------------------------------------------------- race -----
+    startRace() {
+      if (this.state === 'racing') return;
+      this._finishDeferredSetup(); // idempotent safety net
+      this.resetHorsesToStart();
+      // Fresh race clock: horses measure finish times against track.simTime,
+      // so stamp every racer's start time AFTER resetting them to the line.
+      for (const h of this.horses) h.raceStartTime = null;
+      for (const h of this.horses) {
+        h.raceStartTime = this.track.simTime;
+        h.requestNewPath(this.track.pathfinder); // lazy first path, now racing
+      }
+      this.state = 'racing';
+      this.raceFinishedCount = 0;
+      this._noProgressTimer = 0;
+      this.recomputeOdds();
+      this.updateUI();
+
+      const parts = [];
+      for (const [k, v] of Object.entries(this.betting.bets)) parts.push(`${k} $${v}`);
+      this.setStatus(parts.length
+        ? 'Race started — your bets: ' + parts.join(', ')
+        : 'Race started — no bets placed.');
+    }
+
+    setStatus(msg) {
+      if (this.el && this.el.status) this.el.status.textContent = msg;
+    }
+
+    recomputeOdds() {
+      const records = this.horses.map((h) => getRecord(this.memory, h.name));
+      const probs = winProbability(records);
+      this.odds = {};
+      this.horses.forEach((h, i) => { this.odds[h.name] = oddsFromProb(probs[i]); });
+    }
+
+    update(dt) {
+      if (this.state !== 'racing') return;
+      // Guard: a horse stuck mid-circuit can stall the whole race forever.
+      // If no new finisher has appeared for a long stretch, force-close the
+      // race with whatever order we have so the game always returns to the
+      // betting window instead of hanging on "RACING".
+      if (this.raceFinishedCount < this.order.length) this._noProgressTimer = 0;
+      else this._noProgressTimer += dt;
+      if (this.order.length > 0 && this.raceFinishedCount < NUM_HORSES &&
+          this._noProgressTimer > 45) {
+        for (const h of this.horses) {
+          if (!h.hasFinished) {
+            h.markFinished();
+            // A DNF horse must not poison the learning data with a bogus
+            // (huge) finish time — record it as a reset-heavy run instead.
+            h.finishTime = null;
+            this.order.push(h.name);
+            this.raceFinishedCount += 1;
+          }
+        }
+      }
+
+      this.track.simTime += 1 / 60; // fixed timestep keeps physics stable
+      this.tick();
+    }
+
+    finishRace() {
+      this.state = 'results';
+      flushMemory(); // persist the whole race's learning in ONE debounced write
+      const winner = this.order[0];
+      if (this.betting.totalWagered > 0) {
+        this.settlement = this.betting.settle(winner);
+      } else {
+        this.settlement = { winner, staked: 0, payout: 0, profit: 0, details: [] };
+      }
+      for (const h of this.horses) this._restoreHorseMemory(h); // apply new skill levels
+      this.resultsTimer = 4.0; // auto-return to betting after 4s
+      this.updateUI();
+    }
+
+    backToBetting() {
+      this.state = 'betting';
+      this.resetHorsesToStart();
+      this.recomputeOdds();
+      this.updateUI();
+    }
+
+    // --------------------------------------------------------- memory / bank -
+    wipeAllMemory() {
+      if (!confirm('Wipe ALL horse memories? Every horse forgets its past runs and resets to rookie form.')) return;
+      wipeMemory(this.memory, HORSE_NAMES);
+      flushMemory(); // user action: persist immediately, don't wait for debounce
+      for (const h of this.horses) {
+        h.preferredLine = {};
+        h.applySkill(0);
+        h.skill = 0;
+        h.attempts = 0;
+      }
+      this.recomputeOdds();
+      this.updateUI();
+    }
+
+    // Wipe memory when the program is exited out (tab closed / page unloaded).
+    wipeOnExit() {
+      try {
+        localStorage.removeItem(MEMORY_KEY);
+        sessionStorage.removeItem(BALANCE_KEY);
+      } catch (e) { /* ignore */ }
+    }
+
+    enableAutoWipeOnExit() {
+      window.addEventListener('beforeunload', () => this.wipeOnExit());
+      window.addEventListener('pagehide', () => this.wipeOnExit());
+    }
+
+    // -------------------------------------------------------------- loop -----
+    start() {
+      const step = (now) => {
+        const dt = Math.min(0.05, (now - this.lastFrame) / 1000);
+        this.lastFrame = now;
+        this.fps = this.fps * 0.95 + (1 / Math.max(dt, 1e-4)) * 0.05;
+
+        if (!this._ready) this._finishDeferredSetup(); // after first paint
+
+        this.update(dt);
+
+        if (this.state === 'results') {
+          this.resultsTimer -= dt;
+          if (this.resultsTimer <= 0) this.backToBetting();
+        }
+
+        this.draw();
+        this.updateLiveUI();
+        this.raf = requestAnimationFrame(step);
+      };
+      this.raf = requestAnimationFrame(step);
+    }
+
+    stop() { if (this.raf) cancelAnimationFrame(this.raf); }
+
+    // -------------------------------------------------------------- draw -----
+    draw() {
+      const ctx = this.ctx;
+      this.track.draw(ctx);
+
+      for (const h of this.horses) h.draw(ctx);
+
+      // HUD top-left
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.font = 'bold 15px monospace';
+      let hud = '';
+      if (this.state === 'betting') hud = 'PLACE YOUR BETS, then START RACE (or press SPACE)';
+      else if (this.state === 'racing') {
+        const done = this.horses.filter((h) => h.hasFinished).length;
+        hud = `RACING  |  Finished: ${done}/${NUM_HORSES}  |  Time: ${this.raceTime().toFixed(2)}s`;
+      } else hud = 'RACE COMPLETE!';
+
+      const w = ctx.measureText(hud).width + 20;
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(8, 8, w, 26);
+      ctx.fillStyle = this.state === 'racing' ? COLORS.YELLOW : '#7CFC00';
+      ctx.fillText(hud, 18, 14);
+
+      if (this.state === 'results') this.drawResultsBoard(ctx);
+    }
+
+    raceTime() {
+      if (!this.horses.length) return 0;
+      const first = this.horses.find((h) => h.raceStartTime != null);
+      if (!first) return 0;
+      if (this.state !== 'racing') {
+        const times = this.horses.map((h) => h.finishTime).filter((t) => t != null);
+        return times.length ? Math.max(...times) : 0;
+      }
+      return this.track.simTime - first.raceStartTime;
+    }
+
+    drawResultsBoard(ctx) {
+      const pw = 560, ph = 330;
+      const px = (WIDTH - pw) / 2, py = (HEIGHT - ph) / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.fillStyle = COLORS.DARK_BROWN;
+      ctx.fillRect(px, py, pw, ph);
+      ctx.strokeStyle = COLORS.YELLOW;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(px, py, pw, ph);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = COLORS.YELLOW;
+      ctx.font = 'bold 28px monospace';
+      ctx.fillText('RACE RESULTS', WIDTH / 2, py + 18);
+
+      ctx.font = 'bold 16px monospace';
+      let y = py + 58;
+      this.order.forEach((name, i) => {
+        const h = this.horses.find((x) => x.name === name);
+        const rec = getRecord(this.memory, name);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.fillText(`${i + 1}.`, px + 30, y - 4);
+        ctx.fillStyle = h.color;
+        ctx.fillText(name, px + 65, y - 4);
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.fillText(`${(h.finishTime ?? 0).toFixed(2)}s`, px + 200, y - 4);
+        ctx.fillStyle = '#bbb';
+        ctx.fillText(`tries ${rec.races}  best ${rec.bestTime ? rec.bestTime.toFixed(2) + 's' : '--'}`, px + 300, y - 4);
+        y += 26;
+      });
+
+      y += 8;
+      ctx.textAlign = 'center';
+      if (this.settlement && this.settlement.staked > 0) {
+        const s = this.settlement;
+        ctx.font = 'bold 18px monospace';
+        ctx.fillStyle = s.profit >= 0 ? '#7CFC00' : '#ff6b6b';
+        ctx.fillText(
+          `Wagered $${s.staked}  →  Paid $${s.payout}   (${s.profit >= 0 ? '+' : ''}$${s.profit})`,
+          WIDTH / 2, y,
+        );
+        y += 26;
+      } else {
+        ctx.font = '14px monospace';
+        ctx.fillStyle = '#ccc';
+        ctx.fillText('No bets were placed this race.', WIDTH / 2, y);
+        y += 26;
+      }
+
+      ctx.font = '14px monospace';
+      ctx.fillStyle = '#aaa';
+      ctx.fillText(`Returning to betting window in ${Math.max(0, this.resultsTimer).toFixed(1)}s…`, WIDTH / 2, py + ph - 44);
+
+      // Next race button
+      const bw = 200, bh = 34;
+      const bx = WIDTH / 2 - bw / 2, by = py + ph - 34;
+      ctx.fillStyle = COLORS.GREEN;
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, bh);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText('NEXT RACE NOW', WIDTH / 2, by + 9);
+      this._nextBtn = { x: bx, y: by, w: bw, h: bh };
+    }
+
+    // -------------------------------------------------------- click handling -
+    handleCanvasClick(mx, my) {
+      if (this.state === 'results' && this._nextBtn) {
+        const b = this._nextBtn;
+        if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+          this.backToBetting();
+        }
+        return;
+      }
+      if (this.state === 'betting') {
+        for (const h of this.horses) {
+          const d = Math.hypot(h.position.x - mx, h.position.y - my);
+          if (d < 26) { this.addBet(h.name); this.updateUI(); return; }
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------- UI --
+    _bindUI() {
+      this.el = {
+        balance: document.getElementById('balance'),
+        totalBet: document.getElementById('total-bet'),
+        chipSel: document.getElementById('chip-select'),
+        betRows: document.getElementById('bet-rows'),
+        startBtn: document.getElementById('start-race'),
+        clearBtn: document.getElementById('clear-bets'),
+        wipeBtn: document.getElementById('wipe-memory'),
+        wipeExitChk: document.getElementById('wipe-on-exit'),
+        resetBank: document.getElementById('reset-bank'),
+        status: document.getElementById('status-line'),
+        log: document.getElementById('bet-log'),
+      };
+
+      this.el.chipSel.addEventListener('change', () => {
+        this.selectedChip = parseInt(this.el.chipSel.value, 10);
+        this.updateUI();
+      });
+
+      this.el.startBtn.addEventListener('click', () => this.startRace());
+      this.el.clearBtn.addEventListener('click', () => { this.betting.clearBets(); this.updateUI(); });
+      this.el.wipeBtn.addEventListener('click', () => this.wipeAllMemory());
+      this.el.resetBank.addEventListener('click', () => {
+        if (confirm('Reset bankroll to $' + STARTING_BALANCE + '?')) { this.betting.resetBankroll(); this.updateUI(); }
+      });
+
+      if (this.el.wipeExitChk.checked) this.enableAutoWipeOnExit();
+
+      this.canvas.addEventListener('mousedown', (e) => {
+        const r = this.canvas.getBoundingClientRect();
+        const sx = this.canvas.width / r.width, sy = this.canvas.height / r.height;
+        this.handleCanvasClick((e.clientX - r.left) * sx, (e.clientY - r.top) * sy);
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') { e.preventDefault(); if (this.state !== 'racing') this.startRace(); }
+        if (e.key === 'r' || e.key === 'R') { if (this.state === 'racing') this.resetHorsesToStart(); }
+      });
+
+      this.buildBetRows();
+    }
+
+    buildBetRows() {
+      this.el.betRows.innerHTML = '';
+      this.rowRefs = {};
+      for (const h of this.horses) {
+        const row = document.createElement('div');
+        row.className = 'bet-row';
+
+        const swatch = document.createElement('span');
+        swatch.className = 'swatch';
+        swatch.style.background = h.color;
+
+        const name = document.createElement('span');
+        name.className = 'hname';
+        name.textContent = h.name;
+
+        const stats = document.createElement('span');
+        stats.className = 'hstats';
+
+        const odds = document.createElement('span');
+        odds.className = 'odds';
+
+        const bet = document.createElement('span');
+        bet.className = 'betamt';
+
+        const plus = document.createElement('button');
+        plus.className = 'chip-btn';
+        plus.textContent = '+';
+        plus.title = `Bet $${this.selectedChip} on ${h.name}`;
+        plus.addEventListener('click', () => { this.addBet(h.name); this.updateUI(); });
+
+        const minus = document.createElement('button');
+        minus.className = 'chip-btn small';
+        minus.textContent = '−';
+        minus.title = `Remove bets on ${h.name}`;
+        minus.addEventListener('click', () => { this.betting.removeBet(h.name); this.updateUI(); });
+
+        row.append(swatch, name, stats, odds, bet, plus, minus);
+        this.el.betRows.appendChild(row);
+        this.rowRefs[h.name] = { row, stats, odds, bet, plus };
+      }
+    }
+
+    addBet(horseName) {
+      if (this.state !== 'betting') return;
+      this.betting.placeBet(horseName, this.selectedChip);
+    }
+
+    updateUI() {
+      this.el.balance.textContent = `$${this.betting.balance}`;
+      for (const h of this.horses) {
+        const ref = this.rowRefs[h.name];
+        const rec = getRecord(this.memory, h.name);
+        const hist = rec.history.slice(-5).map((x) => x.time.toFixed(1)).join(', ');
+        ref.stats.textContent = rec.races
+          ? `${rec.races} runs · ${rec.wins}W · best ${rec.bestTime ? rec.bestTime.toFixed(2) : '--'}s` +
+            (hist ? ` · last: ${hist}s` : '')
+          : 'ROOKIE — no memory of past runs';
+        ref.odds.textContent = `${(this.odds[h.name] ?? 2).toFixed(1)}×`;
+        ref.bet.textContent = this.betting.bets[h.name] ? `$${this.betting.bets[h.name]}` : '';
+        ref.plus.disabled = this.state !== 'betting';
+        ref.plus.title = `Bet $${this.selectedChip} on ${h.name}`;
+      }
+      this.el.startBtn.disabled = this.state === 'racing';
+      this.el.startBtn.textContent = this.state === 'racing' ? 'RACE IN PROGRESS…' : '🏇 START RACE';
+      this.el.totalBet.textContent = `$${this.betting.totalWagered}`;
+
+      // payout log
+      this.el.log.innerHTML = '';
+      for (const entry of this.betting.history) {
+        const li = document.createElement('li');
+        const cls = entry.profit > 0 ? 'win' : entry.profit < 0 ? 'lose' : '';
+        li.className = cls;
+        li.textContent =
+          `${entry.time} — ${entry.winner} won · wagered $${entry.staked} · ` +
+          `${entry.profit >= 0 ? '+' : ''}$${entry.profit} · bank $${entry.balance}`;
+        this.el.log.appendChild(li);
+      }
+    }
+
+    updateLiveUI() {
+      // lightweight per-frame status line only
+      let msg;
+      if (this.state === 'betting') {
+        msg = `Balance $${this.betting.balance} · Chip $${this.selectedChip} · Click + (or a horse on track) to bet · SPACE to start`;
+      } else if (this.state === 'racing') {
+        const leader = [...this.horses]
+          .sort((a, b) => (b.currentCheckpointIndex - a.currentCheckpointIndex))
+          .find((h) => !h.hasFinished);
+        msg = `Race time ${this.raceTime().toFixed(1)}s · Leader: ${leader ? leader.name : this.order[0]}`;
+      } else {
+        msg = `Winner: ${this.order[0]}!`;
+        if (this.settlement && this.settlement.staked > 0) {
+          msg += ` Payout ${this.settlement.profit >= 0 ? '+' : ''}$${this.settlement.profit}`;
+        }
+      }
+      if (this.el.status.textContent !== msg) this.el.status.textContent = msg;
+    }
+  }
+
+  // ---------------------------------------------------------------- BOOT -----
+  function init() {
+    const canvas = document.getElementById('game');
+    const game = new DerbyGame(canvas);
+    window.__derby = game; // handy console hook
+    game.start();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
