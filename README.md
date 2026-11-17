@@ -92,8 +92,7 @@ flowchart TD
 
 ## AI disclosure
 
-This project was written with substantial assistance from an AI coding assistant (Claude,
-Anthropic). The AI generated and refactored the code, consolidated the original multi-file
+This project was written with substantial assistance from an AI coding assistant (Qwen, Alibaba). The AI generated and refactored the code, consolidated the original multi-file
 Python/JS project into this single `index.html`, ran headless verification of the game loop and
 betting settlement, and drafted this README. A human directed the feature set, reviewed the
 output, and owns the result. Treat the implementation as AI-authored code: review and test it
