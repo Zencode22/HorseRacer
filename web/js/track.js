@@ -36,11 +36,20 @@ export class RaceTrack {
     this.pathfinder = new Pathfinding(this.grid);
     this.goal = new Vector2(this.finishLinePos[0], this.finishLinePos[1]);
 
-    this.staticSurface = this._createStaticSurface();
+    // Static surface is built lazily (see prepare()) so constructing the
+    // track during page load stays cheap.
+    this.staticSurface = null;
 
     // Shared simulation clock (seconds, advanced one frame per update) so
     // finish times are real seconds even when the sim runs headless/fast.
     this.simTime = 0;
+  }
+
+  // Build the pre-rendered background once. Called after first paint.
+  prepare() {
+    if (this._prepared) return;
+    this._prepared = true;
+    this.staticSurface = this._createStaticSurface();
   }
 
   _createSquareTrack() {

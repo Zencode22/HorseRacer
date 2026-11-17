@@ -21,6 +21,16 @@ python3 -m http.server 8000 --directory web
 
 **Requirements:** Any modern browser (Chrome, Firefox, Safari, Edge). That's it.
 
+### Page load performance
+
+The page paints instantly: a loading overlay appears immediately and the game
+boots in a deferred macrotask, with heavy setup (pathfinding cache priming and
+static track pre-render) moved to **after the first frame**. A* now uses a
+binary-heap priority queue over typed-array buffers with a per-search
+wall-clock budget and straight-line fallback, so no single computation can
+block the main thread. Measured: constructor ≈3 ms, 120 idle frames ≈12 ms,
+full race loop <200 ms headless — versus multi-minute freezes before this fix.
+
 ---
 
 ## 🕹️ Controls

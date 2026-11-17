@@ -139,3 +139,28 @@ select {
   .bet-row { grid-template-columns: 18px 70px 1fr 50px 40px 40px; }
   .betamt { display: none; }
 }
+
+/* Loading overlay — shown instantly, hidden after the first painted frame */
+#loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #1a120a;
+  color: #deb887;
+  font-family: monospace;
+  transition: opacity 0.3s ease;
+}
+#loading-overlay.hidden { opacity: 0; pointer-events: none; }
+.spinner {
+  width: 42px; height: 42px;
+  border: 4px solid #654321;
+  border-top-color: #ffd60a;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

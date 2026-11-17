@@ -113,6 +113,13 @@ export class Horse {
 
   requestNewPath(pathfinder) {
     if (this.target === null || this.hasFinished) return;
+    // Safety net: never let a path search run unbounded. If the horse is far
+    // from any known track point, skip searching entirely and steer straight
+    // at the checkpoint (the attractToTrack/Checkpoint forces recover it).
+    const nearTrack = this.track
+      ? this.track.isPositionOnTrack(this.position)
+      : true;
+    if (!nearTrack) { this.currentPath = []; return; }
     const start = [this.position.x, this.position.y];
     const end = [this.target.x, this.target.y];
     const result = pathfinder.findPath(start, end);

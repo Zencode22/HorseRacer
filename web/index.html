@@ -56,12 +56,41 @@
     <footer id="status-line">Loading…</footer>
   </main>
 
+  <!-- Loading overlay: visible instantly, removed as soon as the game's
+       first frame paints. Heavy setup (pathfinding caches, track render)
+       runs AFTER first paint so this never blocks for minutes. -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-text">Preparing the derby…</p>
+  </div>
+
   <script type="module">
     import { DerbyGame } from './js/main.js';
-    const game = new DerbyGame(document.getElementById('game'));
-    game.enableAutoWipeOnExit(); // default: wipe memory on exit (checkbox reflects it)
-    game.start();
-    window.__derby = game; // handy for debugging
+
+    const status = document.getElementById('status-line');
+    const overlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+
+    // Defer module evaluation work to the next macrotask so the HTML above
+    // paints before any game code runs.
+    setTimeout(() => {
+      try {
+        const game = new DerbyGame(document.getElementById('game'));
+        game.enableAutoWipeOnExit(); // default: wipe memory on exit (checkbox reflects it)
+        game.start();
+        window.__derby = game; // handy for debugging
+      } catch (err) {
+        console.error(err);
+        loadingText.textContent = 'Failed to start: ' + err.message;
+        status.textContent = 'Error starting game — see console.';
+        return;
+      }
+      // Hide the overlay once the first frame has actually been drawn.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        overlay.classList.add('hidden');
+        status.textContent = 'Ready.';
+      }));
+    }, 0);
   </script>
 </body>
 </html>
